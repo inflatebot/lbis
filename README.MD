@@ -73,4 +73,16 @@ The following points are advised when building and using lBIS to mitigate these 
 		- use lBIS while under the influence of any substance which may impair your ability to make sound judgements or quick reactions.
 		- give control to anybody you do not trust to behave safely.
 
+# WIP
+- Draw The Rest Of The Owl
+- Buttplug support?? (dependent on buttplug-py working with Micropython and me being able to decipher it, tl;dr We'll See)
+
+# Thanks
+- My wife
+- Fizz
+- Toaster
+- Brokenxana
+- An individual whom I should confirm that they're okay with me mentioning their name here
+- The KinkyMakers Discord server
+
 [^1]: if LaTeX can get away with That, I can get away with this. I understand that it's a chi, I don't care.
