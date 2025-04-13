@@ -2,7 +2,7 @@
 
 The Leg-worn Belly Inflation System, or lBIS (lowercase L, read like "ibis" [^1]) is a discreet wearable air pump that inflates the user at a gentle, safe(-ish) pace. It is designed to be worn casually, as one would a plug or ring, and be easy to maintain. It is controlled remotely using a WiFi-enabled microcontroller. The components are assembled onto a simple webbing legband which is worn under the clothes.
 
-The source code and plans for lBIS are distributed under the MIT License.
+The source code and plans for lBIS are distributed under the [MIT License.](LICENSE.MD)
 
 > [!IMPORTANT]
 > The lBIS prototype is a reference design that uses off-the-shelf components. This is the designer's first major electronics project. It should not be taken as gospel on the best way to execute this concept. The purpose of open-sourcing lBIS is for the interest and curiosity of the kink community and as a public document of the project. Take the advice herein with a grain of salt and use your own judgement. The prototype was built with a... we'll say *lax* attitude for the builder's well-being. The builder however does care about *your* well-being, and will try to steer you towards doing this better than they did.
