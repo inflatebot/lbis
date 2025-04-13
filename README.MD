@@ -49,7 +49,7 @@ The following could go wrong when using lBIS.
 - The microcontroller could hang or fail to respond, becoming stuck on.
 - The lBIS prototype uses a MOSFET driver to control power to the pump; a competently-made driver should "fail safe" (shut off power when no voltage is present) but the possibility exists that the driver fails to close when the GPIO pin is pulled low. This should be verified before use.
 - The API may be used erroneously (or maliciously!)
-- You may misjudge your limits, or your body may respond in an unexpected way.
+- You (or a partner!) may misjudge your limits, or your body may respond in an unexpected way (EVEN IF YOU HAVE INFLATED MANY TIMES BEFORE)
 
 The following points are advised when building and using lBIS to mitigate these risks.
 
