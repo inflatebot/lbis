@@ -61,7 +61,7 @@ The following points are advised when building and using lBIS to mitigate these 
 	- If your lBIS uses an unenclosed battery/battery module, the above is *extra* important. Lithium batteries are scary. Don't fuck with them.
 
 - Programming:
-	- The reference source code for the prototype implements a time limit for the pump. Leaving this enabled is recommended. Get to know the pump you're using and how long it takes to bring you to your usual maximum, and set your time limit accordingly.
+	- The reference source code for the prototype, when the prototype is built, will implement a time limit for the pump. Leaving this enabled is recommended. Get to know the pump you're using and how long it takes to bring you to your usual maximum, and set your time limit accordingly.
 	- If the pump will be controlled by a third party, implementing this time limit as a "session length" which will lock out the pump when exceeded is a prudent idea.
 	- Your remote control implementation should operate over a secure connection.
 
