@@ -11,7 +11,7 @@ The source code and plans for lBIS are distributed under the MIT License.
 > lBIS inflates the user via air enema, a process which carries an inherent risk. lBIS is not intended for users who are not already comfortable and experienced inflating themselves. While the pump utilized *shouldn't* be capable of causing severe injury, by building and using lBIS, you agree to do so at your own risk. See [Safety](#safety) for recommended practice.
 
 > [!CAUTION]
-> lBIS opens up the possibility of public play. Ensure that your usage of lBIS is compliant with regional laws, public decency, and common sense. Don't Be That Guy:tm:.
+> lBIS opens up the possibility of public play. Ensure that your usage of lBIS is compliant with regional laws, public decency, and common sense. Don't Be That Guy™.
 
 # Materials
 
