@@ -49,7 +49,7 @@ The following could go wrong when using lBIS.
 - The microcontroller could hang or fail to respond, becoming stuck on.
 - The lBIS prototype uses a MOSFET driver to control power to the pump; a competently-made driver should "fail safe" (shut off power when no voltage is present) but the possibility exists that the driver fails to close when the GPIO pin is pulled low. This should be verified before use.
 - The API may be used erroneously (or maliciously!)
-- You may misjudge your limits, or your body may respond in an unexpected way.
+- You (or a partner!) may misjudge your limits, or your body may respond in an unexpected way (EVEN IF YOU HAVE INFLATED MANY TIMES BEFORE)
 
 The following points are advised when building and using lBIS to mitigate these risks.
 
@@ -61,7 +61,7 @@ The following points are advised when building and using lBIS to mitigate these 
 	- If your lBIS uses an unenclosed battery/battery module, the above is *extra* important. Lithium batteries are scary. Don't fuck with them.
 
 - Programming:
-	- The reference source code for the prototype implements a time limit for the pump. Leaving this enabled is recommended. Get to know the pump you're using and how long it takes to bring you to your usual maximum, and set your time limit accordingly.
+	- The reference source code for the prototype, when the prototype is built, will implement a time limit for the pump. Leaving this enabled is recommended. Get to know the pump you're using and how long it takes to bring you to your usual maximum, and set your time limit accordingly.
 	- If the pump will be controlled by a third party, implementing this time limit as a "session length" which will lock out the pump when exceeded is a prudent idea.
 	- Your remote control implementation should operate over a secure connection.
 
@@ -73,4 +73,14 @@ The following points are advised when building and using lBIS to mitigate these 
 		- use lBIS while under the influence of any substance which may impair your ability to make sound judgements or quick reactions.
 		- give control to anybody you do not trust to behave safely.
 
-[^1]: if LaTeX can get away with That, I can get away with this
+# WIP
+- Draw The Rest Of The Owl
+- Buttplug support?? (dependent on buttplug-py working with Micropython and me being able to decipher it, tl;dr We'll See)
+
+# Thanks
+- My wife, Brokenxana, and a fourth individual (whose consent to be named here is pending) - ~being filthy enablers~ Funding my broke ass
+- Fizz, Toaster, my other play-partners not mentioned above, the Trashpanda Discord server - Moral support
+- The KinkyMakers Discord server - Technical advice, leading me away from a path of ruin
+- MausTec, The buttplug.io Project - Inspiration
+
+[^1]: if LaTeX can get away with That, I can get away with this. I understand that it's a chi, I don't care.
