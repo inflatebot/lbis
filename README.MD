@@ -78,11 +78,9 @@ The following points are advised when building and using lBIS to mitigate these 
 - Buttplug support?? (dependent on buttplug-py working with Micropython and me being able to decipher it, tl;dr We'll See)
 
 # Thanks
-- My wife
-- Fizz
-- Toaster
-- Brokenxana
-- An individual whom I should confirm that they're okay with me mentioning their name here
-- The KinkyMakers Discord server
+- Fizz, Toaster, the Trashpanda Discord server - Moral support
+- My wife, Brokenxana, and a third individual (whose consent to be named here is pending) - Funding, being ~enablers~ great play partners
+- The KinkyMakers Discord server - Technical advice, leading me away from a path of ruin
+- MausTec, The buttplug.io Project - Inspiration
 
 [^1]: if LaTeX can get away with That, I can get away with this. I understand that it's a chi, I don't care.
