@@ -78,7 +78,7 @@ The following points are advised when building and using lBIS to mitigate these 
 - Buttplug support?? (dependent on buttplug-py working with Micropython and me being able to decipher it, tl;dr We'll See)
 
 # Thanks
-- My wife, Brokenxana, and a fourth individual (whose consent to be named here is pending) - ~being filthy enablers~ Funding
+- My wife, Brokenxana, and a fourth individual (whose consent to be named here is pending) - ~being filthy enablers~ Funding my broke ass
 - Fizz, Toaster, my other play-partners not mentioned above, the Trashpanda Discord server - Moral support
 - The KinkyMakers Discord server - Technical advice, leading me away from a path of ruin
 - MausTec, The buttplug.io Project - Inspiration
