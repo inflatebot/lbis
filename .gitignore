@@ -1,11 +1,4 @@
-.gitignore
 .editorconfig
-.micropico
-diagram.json
-wokwi.toml
 .vscode/extensions.json
 .vscode/settings.json
-firmware/RPI_PICO_W-20241129-v1.24.1.uf2
-firmware/RPI_PICO-20230426-v1.20.0.uf2
-firmware/RPI_PICO2_W-20250412-v1.25.0-preview.540.g0b3ad98ea.uf2
-firmware/mp_firmware_unofficial_latest.uf2
+micropython/

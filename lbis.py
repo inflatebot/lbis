@@ -1,14 +1,31 @@
-from phew import connect_to_wifi, server, logging
-from machine import Pin,WDT # we have 512k so it's in our best interest to be choosy
-import utime
+from phew import server, logging
+from machine import Pin, WDT, reset
+import asyncio
 
-# init stuff
-#ouppy = WDT(timeout=5000) # 5 second timeout
-ip = connect_to_wifi("Photon","eradelta") # we're just gonna trust that phew's connect_to_wifi() function works
-print("Connected to WiFi, IP:", ip)
-#utime.sleep(0.1) # wait for USB (although since power is coming from USB this might be redundant? look the example implementation had this)
+ouppy = WDT(timeout=10000)
 
-pumpSwitch = Pin(7, Pin.OUT) # my schematic has pin 7 for the i/o but i may use a different one
+async def feed_async():
+  while True:
+    ouppy.feed()
+    await asyncio.sleep(5)
+
+def run(pin,host,port):
+    global pumpSwitch
+    pumpSwitch = Pin(pin or 0, Pin.OUT)
+    pumpSwitch.value(0) # make sure it's off to start
+    asyncio.create_task(feed_async())
+    server.run(host or "0.0.0.0", port or 80)
+
+@server.route("/api/marco", methods=["GET"])
+def ping(request):
+  return "Polo!", 200, {"Content-Type": "application/json"}
+
+@server.route("/api/restart", methods=["POST"])
+def restart(request):
+    # restart the server
+    print("Restarting...")
+    reset()
+    return "Restarting...", 200, {"Content-Type": "application/json"}
 
 @server.route("/api/setPumpState", methods=["POST"])
 def switch(request):
