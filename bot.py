@@ -7,7 +7,8 @@ import json
 
 # lBIS Discord Bot Reference Implementation
 # This bot was 100% vibe-coded with GPT4.1 and Claude 3.5 Sonnet. It is not intended to be stable, secure, or sensible.
-# Please don't commit your user secrets. Ty.
+# While you are able to latch your lBIS to prevent Shenanigans, you definitely shouldn't invite this bot to any public servers because ANYBODY can use the commands!!
+# Also please don't commit your user secrets. Ty.
 # - Bot
 
 # Ensure bot.json exists
