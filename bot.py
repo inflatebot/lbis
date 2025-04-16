@@ -5,6 +5,11 @@ from discord.ext import commands
 import aiohttp
 import json
 
+# lBIS Discord Bot Reference Implementation
+# This bot was 100% vibe-coded with GPT4.1 and Claude 3.5 Sonnet. It is not intended to be stable, secure, or sensible.
+# Please don't commit your user secrets. Ty.
+# - Bot
+
 # Ensure bot.json exists
 DEFAULT_CONFIG = {
     "discord_token": "changeme",
