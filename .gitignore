@@ -2,3 +2,4 @@
 .vscode/extensions.json
 .vscode/settings.json
 micropython/
+bot.json
