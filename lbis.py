@@ -1,19 +1,10 @@
-from phew import server, logging
-from machine import Pin, WDT, reset
-import asyncio
-
-ouppy = WDT(timeout=10000)
-
-async def feed_async():
-  while True:
-    ouppy.feed()
-    await asyncio.sleep(5)
+from phew import server
+from machine import Pin, soft_reset
 
 def run(pin,host,port):
     global pumpSwitch
-    pumpSwitch = Pin(pin or 0, Pin.OUT)
+    pumpSwitch = Pin(pin or 7, Pin.OUT)
     pumpSwitch.value(0) # make sure it's off to start
-    asyncio.create_task(feed_async())
     server.run(host or "0.0.0.0", port or 80)
 
 @server.route("/api/marco", methods=["GET"])
@@ -24,7 +15,7 @@ def ping(request):
 def restart(request):
     # restart the server
     print("Restarting...")
-    reset()
+    soft_reset()
     return "Restarting...", 200, {"Content-Type": "application/json"}
 
 @server.route("/api/setPumpState", methods=["POST"])
@@ -39,7 +30,7 @@ def switch(request):
   #return json.dumps({"message" : "OK"}), 200, {"Content-Type": "application/json"}
 
 @server.route("/api/getPumpState", methods=["GET"])
-def stateCheck():
+def stateCheck(request):
   return f"{pumpSwitch.value()}", 200, {"Content-Type": "application/json"}
   #return json.dumps({"message" : pumpSwitch.value()}), 200, {"Content-Type": "application/json"}
 
