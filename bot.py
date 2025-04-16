@@ -41,6 +41,7 @@ API_BASE_URL = config.get('api_base_url', 'http://localhost:80')
 
 # Global latch state
 latch_active = False
+latch_timer = None  # Store the task for timed unlatch
 
 session_time_remaining = 0  # Current session time remaining in seconds
 session_pump_start = None  # When the pump was last turned on
@@ -76,26 +77,50 @@ def save_session_state():
     state = {
         "session_time_remaining": session_time_remaining,
         "session_pump_start": session_pump_start,
-        "latch_active": latch_active
+        "latch_active": latch_active,
+        "latch_end_time": latch_end_time if 'latch_end_time' in globals() else None
     }
     with open('session.json', 'w') as f:
         json.dump(state, f)
 
 def load_session_state():
     """Load session state from disk"""
-    global session_time_remaining, session_pump_start, latch_active
+    global session_time_remaining, session_pump_start, latch_active, latch_end_time
     try:
         with open('session.json', 'r') as f:
             state = json.load(f)
             session_time_remaining = state.get('session_time_remaining', 0)
             session_pump_start = state.get('session_pump_start')
             latch_active = state.get('latch_active', False)
+            latch_end_time = state.get('latch_end_time')
+            
+            # If there was a timed latch, restore it
+            if latch_end_time and latch_active:
+                remaining = latch_end_time - asyncio.get_event_loop().time()
+                if remaining > 0:
+                    asyncio.create_task(auto_unlatch(remaining))
+                else:
+                    latch_active = False
     except FileNotFoundError:
-        # Initialize with defaults if file doesn't exist
         session_time_remaining = 0
         session_pump_start = None
         latch_active = False
+        latch_end_time = None
         save_session_state()
+
+async def auto_unlatch(delay):
+    """Automatically unlatch after specified delay"""
+    global latch_active, latch_timer
+    await asyncio.sleep(delay)
+    latch_active = False
+    latch_timer = None
+    save_session_state()
+    if OWNER_ID:
+        try:
+            wearer = await bot.fetch_user(OWNER_ID)
+            await wearer.send("Timed latch has expired - pump is now unlatched.")
+        except Exception as e:
+            print(f"Failed to notify wearer of unlatch: {e}")
 
 OWNER_ID = config.get("wearer_id", None)
 OWNER_SECRET = config.get("wearer_secret", "changeme")  # Add this to your bot.json
@@ -109,8 +134,15 @@ async def notify_wearer(interaction: discord.Interaction, command_name: str):
         if wearer:
             location = "Direct Messages" if interaction.guild is None else f"{interaction.guild.name} / #{interaction.channel.name}"
             user_info = f"{interaction.user} ({interaction.user.id})"
+            
+            # Get command parameters
+            params = []
+            for option in interaction.data.get("options", []):
+                params.append(f"{option['name']}:{option['value']}")
+            param_str = " " + " ".join(params) if params else ""
+            
             await wearer.send(
-                f"Command `{command_name}` used by {user_info} in {location}."
+                f"Command `{command_name}{param_str}` used by {user_info} in {location}."
             )
     except Exception as e:
         print(f"Failed to notify wearer: {e}")
@@ -307,16 +339,29 @@ async def set_wearer(interaction: discord.Interaction, secret: str):
     else:
         await interaction.response.send_message("Incorrect secret.", ephemeral=True)
 
-@bot.tree.command(name="latch", description="Latch or unlatch the pump, preventing it from being turned on. Only the device wearer can do this.")
+@bot.tree.command(name="latch", description="Toggle, set, or time-limit the pump latch. Use without parameters to toggle.")
 @app_commands.check(is_wearer)
-@app_commands.describe(state="Set to true to latch, false to unlatch")
-async def latch(interaction: discord.Interaction, state: bool):
-    global latch_active
-    latch_active = state
-    status = "latched (pump_on disabled)" if state else "unlatched (pump_on enabled)"
+@app_commands.describe(
+    state="Optional: Set to true to latch, false to unlatch. Omit to toggle.",
+    minutes="Optional: Number of minutes to latch for"
+)
+async def latch(interaction: discord.Interaction, state: bool = None, minutes: int = None):
+    global latch_active, latch_timer, latch_end_time
+
+    # Determine new latch state
+    new_state = not latch_active if state is None else state
+
+    # Cancel existing timer if any
+    if latch_timer:
+        latch_timer.cancel()
+        latch_timer = None
+        latch_end_time = None
+
+    latch_active = new_state
+    status = "latched" if new_state else "unlatched"
 
     # If latching, ensure pump is off
-    if state:
+    if new_state:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{API_BASE_URL}/api/setPumpState",
@@ -325,8 +370,15 @@ async def latch(interaction: discord.Interaction, state: bool):
                 if response.status != 200:
                     await interaction.response.send_message("Failed to turn pump off while latching", ephemeral=True)
                     return
-                update_session_time()  # Update session time when turning off pump
-    
+                update_session_time()
+
+        # Set up timed unlatch if minutes specified
+        if minutes is not None and minutes > 0:
+            latch_end_time = asyncio.get_event_loop().time() + (minutes * 60)
+            latch_timer = asyncio.create_task(auto_unlatch(minutes * 60))
+            status = f"{status} for {minutes} minutes"
+
+    save_session_state()
     await interaction.response.send_message(f"Pump is now {status}.")
 
 @latch.error
