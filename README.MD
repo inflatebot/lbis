@@ -48,7 +48,7 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 4. Mount the microcontroller's filesystem and place `main.py`, `lbis.py` and `wifi.json` into the root.
 
 ## Pre-Assembly, Testing
-1. Wire the battery, microcontroller, pump and relay according to the schematic. [TODO: schematic link]
+1. Wire the battery, microcontroller, pump and relay according to the [schematic.](schematic/Scheme-it-export-lBIS-2025-04-17-08-44.pdf)
 
 2. Power the microcontroller and use `mpremote` (ensure it's available on PATH; the easiest way to do this is with `uv`: `uv tool install mpremote`) to connect to the REPL
 
