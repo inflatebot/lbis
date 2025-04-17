@@ -42,11 +42,17 @@ API_BASE_URL = config.get('api_base_url', 'http://localhost:80')
 # Global latch state
 latch_active = False
 latch_timer = None  # Store the task for timed unlatch
+latch_reason = None  # Store the reason for the latch
 
 session_time_remaining = 0  # Current session time remaining in seconds
 session_pump_start = None  # When the pump was last turned on
 
-# Add after the global variables
+service_was_up = True  # Tracks last known state
+
+OWNER_ID = config.get("wearer_id", None)
+OWNER_SECRET = config.get("wearer_secret", "changeme")  # Add this to your bot.json
+
+# Add after global variables
 def update_session_time():
     """Updates session time based on pump usage"""
     global session_time_remaining, session_pump_start
@@ -78,14 +84,15 @@ def save_session_state():
         "session_time_remaining": session_time_remaining,
         "session_pump_start": session_pump_start,
         "latch_active": latch_active,
-        "latch_end_time": latch_end_time if 'latch_end_time' in globals() else None
+        "latch_end_time": latch_end_time if 'latch_end_time' in globals() else None,
+        "latch_reason": latch_reason
     }
     with open('session.json', 'w') as f:
         json.dump(state, f)
 
 def load_session_state():
     """Load session state from disk"""
-    global session_time_remaining, session_pump_start, latch_active, latch_end_time
+    global session_time_remaining, session_pump_start, latch_active, latch_end_time, latch_reason
     try:
         with open('session.json', 'r') as f:
             state = json.load(f)
@@ -93,6 +100,7 @@ def load_session_state():
             session_pump_start = state.get('session_pump_start')
             latch_active = state.get('latch_active', False)
             latch_end_time = state.get('latch_end_time')
+            latch_reason = state.get('latch_reason')
             
             # If there was a timed latch, restore it
             if latch_end_time and latch_active:
@@ -106,6 +114,7 @@ def load_session_state():
         session_pump_start = None
         latch_active = False
         latch_end_time = None
+        latch_reason = None
         save_session_state()
 
 async def auto_unlatch(delay):
@@ -121,9 +130,6 @@ async def auto_unlatch(delay):
             await wearer.send("Timed latch has expired - pump is now unlatched.")
         except Exception as e:
             print(f"Failed to notify wearer of unlatch: {e}")
-
-OWNER_ID = config.get("wearer_id", None)
-OWNER_SECRET = config.get("wearer_secret", "changeme")  # Add this to your bot.json
 
 def is_wearer(interaction: discord.Interaction) -> bool:
     return interaction.user.id == OWNER_ID
@@ -156,7 +162,52 @@ def dm_wearer_on_use(command_name):
         return wrapper
     return decorator
 
-service_was_up = True  # Tracks last known state
+async def update_bot_status():
+    """Update bot's status to reflect current pump state and session info"""
+    try:
+        # Base status on service availability
+        if not service_was_up:
+            await bot.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.playing,
+                    name="⚠️ Service Unreachable"
+                ),
+                status=discord.Status.dnd
+            )
+            return
+        
+        # Get pump state first
+        pump_state = "0"
+        if not latch_active:  # Only check pump state if not latched
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{API_BASE_URL}/api/getPumpState") as response:
+                    if response.status == 200:
+                        pump_state = await response.text()
+        
+        # Determine status text
+        if latch_active:
+            status_text = "🔒 Latched"
+            if latch_reason:
+                # Truncate reason if too long
+                short_reason = (latch_reason[:20] + '..') if len(latch_reason) > 20 else latch_reason
+                status_text += f": {short_reason}"
+            status = discord.Status.idle
+        else:
+            status_text = "🟢 ON" if pump_state == "1" else "⚫ READY"
+            status = discord.Status.online if pump_state == "1" else discord.Status.idle
+        
+        # Add time info
+        status_text += f" | {format_time(session_time_remaining)}"
+
+        await bot.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.playing,
+                name=status_text
+            ),
+            status=status
+        )
+    except Exception as e:
+        print(f"Failed to update status: {e}")
 
 async def service_monitor():
     global service_was_up
@@ -178,11 +229,14 @@ async def service_monitor():
                 try:
                     wearer = await bot.fetch_user(OWNER_ID)
                     if wearer:
-                        await wearer.send("Service appears to be DOWN!")
+                        await wearer.send("Service appears to be down!")
                 except Exception as e:
                     print(f"Failed to DM wearer about service down: {e}")
             service_was_up = False
-        await asyncio.sleep(30)  # Check every 30 seconds
+        
+        # Update bot status only - remove bio update
+        await update_bot_status()
+        await asyncio.sleep(10)
 
 @bot.event
 async def on_ready():
@@ -198,9 +252,11 @@ async def on_ready():
     
     # Start the background service monitor
     bot.loop.create_task(service_monitor())
+    
+    # Add initial status update
+    await update_bot_status()
 
 @bot.tree.command(name="marco", description="Check if the server is responding")
-@dm_wearer_on_use("marco")
 async def marco(interaction: discord.Interaction):
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_BASE_URL}/api/marco") as response:
@@ -210,26 +266,42 @@ async def marco(interaction: discord.Interaction):
             else:
                 await interaction.response.send_message("Failed to reach server")
 
-@bot.tree.command(name="pump", description="Check the current pump state")
-@dm_wearer_on_use("pump")
-async def pump_state(interaction: discord.Interaction):
+@bot.tree.command(name="status", description="Check the current device status")
+@dm_wearer_on_use("status")
+async def device_status(interaction: discord.Interaction):
+    update_session_time()  # Update session time before displaying
+    
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_BASE_URL}/api/getPumpState") as response:
             if response.status == 200:
                 state = await response.text()
                 state_text = "ON" if state == "1" else "OFF"
-                await interaction.response.send_message(f"Pump is currently {state_text}")
+                
+                status_lines = [
+                    f"🔌 Pump: {state_text}",
+                    f"⏲️ Session: {format_time(session_time_remaining)} remaining"
+                ]
+                
+                if latch_active:
+                    latch_msg = "🔒 Pump is latched"
+                    if latch_reason:
+                        latch_msg += f": {latch_reason}"
+                    status_lines.append(latch_msg)
+                
+                await interaction.response.send_message("\n".join(status_lines))
             else:
-                await interaction.response.send_message("Failed to get pump state")
+                await interaction.response.send_message("Failed to get device status")
 
-# Modify pump_on command to require wearer
 @bot.tree.command(name="pump_on", description="Turn the pump on (wearer only)")
 @app_commands.check(is_wearer)
 @dm_wearer_on_use("pump_on")
 async def pump_on(interaction: discord.Interaction):
     global latch_active, session_time_remaining
     if latch_active:
-        await interaction.response.send_message("Pump is currently latched, and cannot be turned on.", ephemeral=True)
+        message = "Pump is currently latched, and cannot be turned on."
+        if latch_reason:
+            message += f"\nReason: {latch_reason}"
+        await interaction.response.send_message(message, ephemeral=True)
         return
     if session_time_remaining <= 0:
         await interaction.response.send_message("No session time remaining. Use /add_time to add more time.", ephemeral=True)
@@ -242,11 +314,11 @@ async def pump_on(interaction: discord.Interaction):
         ) as response:
             if response.status == 200:
                 start_pump_timer()
+                await update_bot_status()
                 await interaction.response.send_message(f"Pump turned ON! {format_time(session_time_remaining)} remaining.")
             else:
                 await interaction.response.send_message("Failed to turn pump on")
 
-# Modify pump_off to update session time
 @bot.tree.command(name="pump_off", description="Turn the pump off")
 @dm_wearer_on_use("pump_off")
 async def pump_off(interaction: discord.Interaction):
@@ -257,11 +329,11 @@ async def pump_off(interaction: discord.Interaction):
             json={"pump": 0}
         ) as response:
             if response.status == 200:
+                await update_bot_status()
                 await interaction.response.send_message(f"Pump turned OFF! {format_time(session_time_remaining)} remaining.")
             else:
                 await interaction.response.send_message("Failed to turn pump off")
 
-# Modify pump_timed to check session time
 @bot.tree.command(name="pump_timed", description="Turn the pump on for a specified duration")
 @app_commands.describe(seconds="Duration in seconds to run the pump")
 @dm_wearer_on_use("pump_timed")
@@ -270,7 +342,10 @@ async def pump_timed(interaction: discord.Interaction, seconds: int):
     max_duration = config.get('max_pump_duration', 30)
     
     if latch_active:
-        await interaction.response.send_message("Pump is currently latched, and cannot be turned on.", ephemeral=True)
+        message = "Pump is currently latched, and cannot be turned on."
+        if latch_reason:
+            message += f"\nReason: {latch_reason}"
+        await interaction.response.send_message(message, ephemeral=True)
         return
     
     if seconds <= 0:
@@ -299,6 +374,7 @@ async def pump_timed(interaction: discord.Interaction, seconds: int):
                 return
         
         start_pump_timer()
+        await update_bot_status()
         await interaction.response.send_message(f"Pump turned ON for {seconds} seconds! {format_time(session_time_remaining)} remaining in session.")
         
         # Wait for specified duration
@@ -311,11 +387,13 @@ async def pump_timed(interaction: discord.Interaction, seconds: int):
             json={"pump": 0}
         ) as response:
             if response.status == 200:
+                await update_bot_status()
                 await interaction.followup.send(f"Pump turned OFF! {format_time(session_time_remaining)} remaining in session.")
             else:
                 await interaction.followup.send("Failed to turn pump off after timeout!")
 
 @bot.tree.command(name="restart", description="Restart the server")
+@app_commands.check(is_wearer)
 @dm_wearer_on_use("restart")
 async def restart(interaction: discord.Interaction):
     async with aiohttp.ClientSession() as session:
@@ -324,6 +402,13 @@ async def restart(interaction: discord.Interaction):
                 await interaction.response.send_message("Server is restarting...")
             else:
                 await interaction.response.send_message("Failed to restart server")
+
+@restart.error
+async def restart_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.CheckFailure):
+        await interaction.response.send_message("Only the device wearer can use this command.", ephemeral=True)
+    else:
+        await interaction.response.send_message("An error occurred.", ephemeral=True)
 
 @bot.tree.command(name="set_wearer", description="Register yourself as this device's wearer (DM only, requires secret)")
 @app_commands.describe(secret="Your secret")
@@ -335,6 +420,7 @@ async def set_wearer(interaction: discord.Interaction, secret: str):
     if secret == OWNER_SECRET:
         OWNER_ID = interaction.user.id
         save_wearer_id(OWNER_ID)
+        await update_bot_status()  # Update status instead of bio
         await interaction.response.send_message("You are now registered as this device's wearer!")
     else:
         await interaction.response.send_message("Incorrect secret.", ephemeral=True)
@@ -343,10 +429,11 @@ async def set_wearer(interaction: discord.Interaction, secret: str):
 @app_commands.check(is_wearer)
 @app_commands.describe(
     state="Optional: Set to true to latch, false to unlatch. Omit to toggle.",
-    minutes="Optional: Number of minutes to latch for"
+    minutes="Optional: Number of minutes to latch for",
+    reason="Optional: Reason for latching"
 )
-async def latch(interaction: discord.Interaction, state: bool = None, minutes: int = None):
-    global latch_active, latch_timer, latch_end_time
+async def latch(interaction: discord.Interaction, state: bool = None, minutes: int = None, reason: str = None):
+    global latch_active, latch_timer, latch_end_time, latch_reason
 
     # Determine new latch state
     new_state = not latch_active if state is None else state
@@ -358,6 +445,7 @@ async def latch(interaction: discord.Interaction, state: bool = None, minutes: i
         latch_end_time = None
 
     latch_active = new_state
+    latch_reason = reason if new_state else None
     status = "latched" if new_state else "unlatched"
 
     # If latching, ensure pump is off
@@ -379,6 +467,7 @@ async def latch(interaction: discord.Interaction, state: bool = None, minutes: i
             status = f"{status} for {minutes} minutes"
 
     save_session_state()
+    await update_bot_status()
     await interaction.response.send_message(f"Pump is now {status}.")
 
 @latch.error
@@ -388,7 +477,6 @@ async def latch_error(interaction: discord.Interaction, error):
     else:
         await interaction.response.send_message("An error occurred.", ephemeral=True)
 
-# Modify add_time to persist state
 @bot.tree.command(name="add_time", description="Add time to the current session (wearer only)")
 @app_commands.check(is_wearer)
 @app_commands.describe(minutes="Minutes to add to the session")
@@ -406,17 +494,18 @@ async def add_time(interaction: discord.Interaction, minutes: int):
         
     update_session_time()  # Update current time first
     session_time_remaining += (minutes * 60)
-    save_session_state()  # Add this line
+    save_session_state()
+    await update_bot_status()
     await interaction.response.send_message(f"Added {minutes} minutes to session. {format_time(session_time_remaining)} remaining.")
 
-# Modify reset_time to persist state
 @bot.tree.command(name="reset_time", description="Reset the session timer (wearer only)")
 @app_commands.check(is_wearer)
 async def reset_time(interaction: discord.Interaction):
     global session_time_remaining, session_pump_start
     session_time_remaining = 0
     session_pump_start = None
-    save_session_state()  # Add this line
+    save_session_state()
+    await update_bot_status()
     await interaction.response.send_message("Session timer has been reset to 0.")
 
 @bot.tree.command(name="session_time", description="Check remaining session time")
@@ -440,7 +529,8 @@ async def set_time(interaction: discord.Interaction, minutes: int):
         return
         
     session_time_remaining = minutes * 60
-    save_session_state()  # Persist the new state
+    save_session_state()
+    await update_bot_status()
     await interaction.response.send_message(f"Session time set to {format_time(session_time_remaining)}.")
 
 # Run the bot

@@ -32,6 +32,6 @@ gc.collect() # my thinking is that this'll free the memory used by the json obje
 
 # allocating pin 0 for testing things on the breadboard. should maybe remove later?
 p0 = Pin(0, Pin.OUT)
-pumpPin = 7
+pumpPin = 6
 
 lbis.run(pumpPin,host="0.0.0.0",port=80)

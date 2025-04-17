@@ -3,3 +3,5 @@
 .vscode/settings.json
 micropython/
 bot.json
+session.json
+session.json
