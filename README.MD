@@ -90,8 +90,6 @@ If you're using a phone hotspot, you can run your lBIS without being tethered to
 
 Almost definitely, there is an easier/safer way of doing all of this, but I am limited by my own knowledge and capabilities here. Please, if you have the knowledge, build on this.
 
-
-
 # Safety
 
 The following could go wrong when using lBIS.
