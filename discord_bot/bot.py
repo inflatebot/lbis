@@ -32,6 +32,15 @@ if not os.path.exists('bot.json'):
 with open('bot.json', 'r') as config_file:
     config = json.load(config_file)
 
+# Validate wearer secret
+if config.get('wearer_secret') == 'changeme':
+    raise ValueError(
+        "\n\nSecurity Error: Default wearer secret detected!\n"
+        "Please edit bot.json and change 'wearer_secret' to a secure password.\n"
+        "This is required to prevent unauthorized access to your device which could pose a safety hazard.\n"
+        "It can be anything, as long as you store it safely.\n"
+    )
+
 # Bot setup with intents
 intents = discord.Intents.default()
 intents.message_content = True
