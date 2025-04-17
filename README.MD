@@ -48,11 +48,11 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 4. Mount the microcontroller's filesystem and place `main.py`, `lbis.py` and `wifi.json` into the root.
 
 ## Pre-Assembly, Testing
-1. Wire the battery, microcontroller, pump and relay according to the [schematic.](schematic/Scheme-it-export-lBIS-2025-04-17-08-44.pdf)
+1. Wire the battery, microcontroller, pump and relay according to the [schematic.](schematic/Scheme-it-export-lBIS-2025-04-17-08-44.pdf) (The GPIO pin you select doesn't matter, as long as you set it properly in `main.py`.)
 
 2. Power the microcontroller and use `mpremote` (ensure it's available on PATH; the easiest way to do this is with `uv`: `uv tool install mpremote`) to connect to the REPL
 
-3. Use `Ctrl-D` to soft-reboot the microcontroller; as of right now, it doesn't always properly start the web server on reboot. When you see lines like the following, it's started correctly:
+3. Use `Ctrl-D` to soft-reboot the microcontroller; as of right now, it doesn't always properly start the web server on a cold boot. When you see lines like the following, it's started correctly:
 ```md
 network config: ('[MCU-IP]', '255.255.255.0')
 2021-01-01 00:04:36 [info     / 424kB] > starting web server on port 80
