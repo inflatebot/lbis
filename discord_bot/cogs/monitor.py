@@ -1,4 +1,3 @@
-\
 import discord
 from discord.ext import commands, tasks
 import aiohttp
@@ -16,12 +15,13 @@ class MonitorCog(commands.Cog):
     async def update_bot_status(self):
         """Update bot's status to reflect current pump state and session info"""
         try:
+            status_text = ""
+            status = discord.Status.online # Default status
+            custom_emoji_obj = None # For the custom emoji object passed to activity
+
             # Base status on service availability
             if not self.bot.service_was_up:
-                activity = discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name="⚠️ Service Unreachable"
-                )
+                status_text = "⚠️ Service Unreachable" # Prepend standard emoji
                 status = discord.Status.dnd
             else:
                 # Get pump state first (only if not latched)
@@ -38,32 +38,45 @@ class MonitorCog(commands.Cog):
                         # Keep pump_state as "0" on connection error/timeout
                         pass # Error logged in service_monitor
 
-                # Determine status text
+                # Determine status text and potentially emoji based on state
                 if self.bot.latch_active:
-                    status_text = "🔒 Latched"
+                    status_text = "🔒 Latched" # Prepend standard emoji
                     if self.bot.latch_reason:
-                        # Truncate reason if too long
                         max_reason_len = 20
                         short_reason = (self.bot.latch_reason[:max_reason_len] + '..') if len(self.bot.latch_reason) > max_reason_len else self.bot.latch_reason
                         status_text += f": {short_reason}"
                     status = discord.Status.idle
                 else:
-                    status_text = "🟢 ON" if pump_state == "1" else "⚫ READY"
-                    status = discord.Status.online if pump_state == "1" else discord.Status.idle
+                    if pump_state == "1":
+                        # Try to use a custom emoji when ON
+                        try:
+                             # Replace with your actual emoji details
+                             custom_emoji_obj = discord.PartialEmoji(name='pump_on_emoji', id=123456789012345678)
+                             status_text = "ON" # Set text separately
+                        except Exception as e: # Fallback if custom emoji fails
+                             print(f"Failed to get custom emoji: {e}. Falling back.")
+                             custom_emoji_obj = None # Ensure it's None on failure
+                             status_text = "🟢 ON" # Prepend standard emoji as fallback
+                        status = discord.Status.online
+                    else:
+                        # Use standard emoji when READY
+                        status_text = "⚫ READY" # Prepend standard emoji
+                        status = discord.Status.idle
 
-                # Add time info
+                # Add time info (append after emoji/state text)
                 status_text += f" | {format_time(self.bot.session_time_remaining)}"
 
-                activity = discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name=status_text
-                )
+            # Create CustomActivity
+            # Pass the custom emoji object (or None) to the emoji parameter
+            activity = discord.CustomActivity(
+                name=status_text,
+                emoji=custom_emoji_obj
+            )
 
             await self.bot.change_presence(activity=activity, status=status)
 
         except Exception as e:
             print(f"Failed to update status: {e}")
-
 
     @tasks.loop(seconds=15) # Check service less frequently, update status more often if needed
     async def service_monitor_task(self):
