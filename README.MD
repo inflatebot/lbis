@@ -48,17 +48,22 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 4. Mount the microcontroller's filesystem and place `main.py`, `lbis.py` and `wifi.json` into the root.
 
 ## Pre-Assembly, Testing
-1. Wire the battery, microcontroller, pump and relay according to the schematic.
+1. Wire the battery, microcontroller, pump and relay according to the schematic. [TODO: schematic link]
+
 2. Power the microcontroller and use `mpremote` (ensure it's available on PATH; the easiest way to do this is with `uv`: `uv tool install mpremote`) to connect to the REPL
-3. Use `Ctrl-D` to soft-reboot the microcontroller; as of right now, it doesn't always properly start the web server on reboot. When you see lines like the following, it's started correctly.
+
+3. Use `Ctrl-D` to soft-reboot the microcontroller; as of right now, it doesn't always properly start the web server on reboot. When you see lines like the following, it's started correctly:
 ```md
 network config: ('[MCU-IP]', '255.255.255.0')
 2021-01-01 00:04:36 [info     / 424kB] > starting web server on port 80
 ```
+
 If the IP address is `0.0.0.0`, then the microcontroller has had an issue with getting an IP address from your access point. (The second address is the subnet mask; this is okay as it is.)
+
 4. From a device which can reach the IP address, use `curl` to test the API:
 `curl --request GET [MCU-IP]/api/marco`
 If it returns `Polo!` then the API is functional.
+
 5. Use `curl` again to test the relay over the API:
 `curl -XPOST -H "Content-type: application/json" -d '{ "pump": 1 }' '10.105.23.145/api/setPumpState'`
 If the wiring is correct and the API is functional, your pump should turn on. Repeat with `'{ "pump": 0 }'` to turn it off again.
