@@ -74,12 +74,12 @@ class PumpCog(commands.Cog):
                  await interaction.response.send_message(f"Error contacting server: {e}", ephemeral=True)
 
 
-    @app_commands.command(name="pump_timed", description="Turn the pump on for a specified duration (wearer only)")
-    @app_commands.check(is_wearer)
+    @app_commands.command(name="pump_timed", description="Turn the pump on for a specified duration")
+    #@app_commands.check(is_wearer)
     @app_commands.describe(seconds="Duration in seconds to run the pump")
     @dm_wearer_on_use("pump_timed")
     async def pump_timed(self, interaction: discord.Interaction, seconds: int):
-        """Turn the pump on for a specified duration (wearer only)"""
+        """Turn the pump on for a specified duration"""
         max_duration = self.bot.config.get('max_pump_duration', 60) # Default 60s
 
         if self.bot.latch_active:

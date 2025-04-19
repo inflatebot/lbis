@@ -35,15 +35,17 @@ class SessionCog(commands.Cog):
         await self.update_status()
         await interaction.response.send_message(f"Added {minutes} minutes to session. {format_time(self.bot.session_time_remaining)} remaining.")
 
-    @app_commands.command(name="reset_time", description="Reset the session timer to 0 (wearer only)")
+    @app_commands.command(name="reset_time", description="Reset the session timer to the default duration (wearer only)")
     @app_commands.check(is_wearer)
     async def reset_time(self, interaction: discord.Interaction):
-        """Reset the session timer to 0 (wearer only)"""
-        self.bot.session_time_remaining = 0
+        """Reset the session timer to the default duration (wearer only)"""
+        # Use the stored default time instead of 0
+        self.bot.session_time_remaining = self.bot.default_session_time
         self.bot.session_pump_start = None # Also clear pump start time
         save_session_state(self.bot)
         await self.update_status()
-        await interaction.response.send_message("Session timer has been reset to 0.")
+        # Update the response message
+        await interaction.response.send_message(f"Session timer has been reset to the default: {format_time(self.bot.session_time_remaining)}.")
 
     @app_commands.command(name="session_time", description="Check remaining session time")
     async def check_time(self, interaction: discord.Interaction):
@@ -66,7 +68,10 @@ class SessionCog(commands.Cog):
             await interaction.response.send_message(f"Cannot set time higher than the configured maximum of {max_session//60} minutes.", ephemeral=True)
             return
 
-        self.bot.session_time_remaining = minutes * 60
+        new_time_seconds = minutes * 60
+        self.bot.session_time_remaining = new_time_seconds
+        # Also update the default session time
+        self.bot.default_session_time = new_time_seconds
         self.bot.session_pump_start = None # Clear pump start if setting time manually
         save_session_state(self.bot)
         await self.update_status()

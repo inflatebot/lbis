@@ -23,44 +23,49 @@ def save_wearer_id(bot, wearer_id):
     bot.OWNER_ID = wearer_id # Update runtime state
 
 def save_session_state(bot):
-    """Save session state to disk"""
+    """Saves the current session state to a file."""
     state = {
-        "session_time_remaining": bot.session_time_remaining,
-        "session_pump_start": bot.session_pump_start,
-        "latch_active": bot.latch_active,
-        "latch_end_time": bot.latch_end_time,
-        "latch_reason": bot.latch_reason
+        'session_time_remaining': bot.session_time_remaining,
+        'last_session_update': bot.last_session_update,
+        'session_pump_start': bot.session_pump_start,
+        'pump_last_on_time': bot.pump_last_on_time,
+        'pump_total_on_time': bot.pump_total_on_time,
+        'pump_state': bot.pump_state,
+        'default_session_time': bot.default_session_time, # Add this line
     }
     with open('session.json', 'w') as f:
         json.dump(state, f)
 
 def load_session_state(bot):
-    """Load session state from disk"""
+    """Loads session state from a file and initializes bot attributes."""
+    default_initial_time = bot.config.get('max_session_time', 1800) # Default to max_session or 30min
     try:
         with open('session.json', 'r') as f:
             state = json.load(f)
             bot.session_time_remaining = state.get('session_time_remaining', 0)
-            bot.session_pump_start = state.get('session_pump_start')
-            bot.latch_active = state.get('latch_active', False)
-            bot.latch_end_time = state.get('latch_end_time')
-            bot.latch_reason = state.get('latch_reason')
+            bot.last_session_update = state.get('last_session_update', None)
+            bot.session_pump_start = state.get('session_pump_start', None)
+            bot.pump_last_on_time = state.get('pump_last_on_time', 0)
+            bot.pump_total_on_time = state.get('pump_total_on_time', 0)
+            bot.pump_state = state.get('pump_state', False)
+            # Load default_session_time here, provide a default
+            bot.default_session_time = state.get('default_session_time', default_initial_time) # Use the default
 
-            # If there was a timed latch, restore it
-            if bot.latch_end_time and bot.latch_active:
-                remaining = bot.latch_end_time - asyncio.get_event_loop().time()
-                if remaining > 0:
-                    bot.latch_timer = asyncio.create_task(auto_unlatch(bot, remaining))
-                else:
-                    bot.latch_active = False # Latch expired while offline
-                    bot.latch_end_time = None
-                    bot.latch_reason = None # Clear reason if expired
-    except FileNotFoundError:
+    except (IOError, json.JSONDecodeError):
+        print("Session state file not found or invalid. Initializing with defaults.")
+        # Initialize with defaults if file doesn't exist or is corrupt
         bot.session_time_remaining = 0
+        bot.last_session_update = None
         bot.session_pump_start = None
-        bot.latch_active = False
-        bot.latch_end_time = None
-        bot.latch_reason = None
-        save_session_state(bot) # Create the file if it doesn't exist
+        bot.pump_last_on_time = 0
+        bot.pump_total_on_time = 0
+        bot.pump_state = False
+        # Initialize default_session_time here too
+        bot.default_session_time = default_initial_time # Use the default
+
+    # Ensure ready_note attribute exists even if loading from an old file
+    if not hasattr(bot, 'ready_note'):
+        bot.ready_note = None
 
 # --- Session Time Management ---
 

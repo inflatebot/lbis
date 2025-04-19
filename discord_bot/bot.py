@@ -63,6 +63,7 @@ class lBISBot(commands.Bot):
         self.session_time_remaining = 0
         self.session_pump_start = None
         self.service_was_up = True  # Assume service is up initially
+        self.ready_note = None # Initialize ready_note
 
         # Load persistent state
         utils.load_session_state(self)  # Pass self (the bot instance)
