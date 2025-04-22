@@ -2,81 +2,55 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 import asyncio
-from utils import format_time
+from utils import format_time, api_request, save_session_state, update_session_time
 
 class MonitorCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.service_monitor_task.start()
+        self.session_timer.start()
 
     def cog_unload(self):
         self.service_monitor_task.cancel()
+        self.session_timer.cancel()
 
     async def update_bot_status(self):
-        """Update bot's status to reflect current pump state and session info"""
-        try:
-            status_text = ""
-            status = discord.Status.online # Default status
-            custom_emoji_obj = None # For the custom emoji object passed to activity
+        """Updates the bot's Discord presence based on current state."""
+        if not self.bot.is_ready() or not self.bot.service_was_up:
+            status = discord.Status.dnd # Do Not Disturb if not ready or API down
+            activity_string = "API Down" if not self.bot.service_was_up else "Starting..."
+            activity = discord.Game(name=activity_string)
+        else:
+            status = discord.Status.online
+            session_str = format_time(self.bot.session_time_remaining)
+            banked_str = format_time(self.bot.banked_time) # Added
+            latch_str = "🔒" if self.bot.latch_active else ""
 
-            # Base status on service availability
-            if not self.bot.service_was_up:
-                status_text = "⚠️ Service Unreachable" # Prepend standard emoji
-                status = discord.Status.dnd
+            pump_state_str = ""
+            # Check if a task is running first
+            if self.bot.pump_task and not self.bot.pump_task.done():
+                pump_state_str = "ON"
             else:
-                # Get pump state first (only if not latched)
-                pump_state = "0" # Assume off if latched or error
-                if not self.bot.latch_active:
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                             # Short timeout for status update
-                            async with session.get(f"{self.bot.API_BASE_URL}/api/getPumpState", timeout=3) as response:
-                                if response.status == 200:
-                                    pump_state = await response.text()
-                                # else: keep pump_state as "0" on error
-                    except Exception:
-                        # Keep pump_state as "0" on connection error/timeout
-                        pass # Error logged in service_monitor
-
-                # Determine status text and potentially emoji based on state
-                if self.bot.latch_active:
-                    status_text = "🔒 Latched" # Prepend standard emoji
-                    if self.bot.latch_reason:
-                        max_reason_len = 20
-                        short_reason = (self.bot.latch_reason[:max_reason_len] + '..') if len(self.bot.latch_reason) > max_reason_len else self.bot.latch_reason
-                        status_text += f": {short_reason}"
-                    status = discord.Status.idle
+                # If no task, check API (best effort)
+                pump_state = await api_request(self.bot, "pump/status")
+                if pump_state is not None and pump_state.get('is_on'):
+                    pump_state_str = "ON"
                 else:
-                    if pump_state == "1":
-                        # Try to use a custom emoji when ON
-                        try:
-                             # Replace with your actual emoji details
-                             custom_emoji_obj = discord.PartialEmoji(name='pump_on_emoji', id=123456789012345678)
-                             status_text = "ON" # Set text separately
-                        except Exception as e: # Fallback if custom emoji fails
-                             print(f"Failed to get custom emoji: {e}. Falling back.")
-                             custom_emoji_obj = None # Ensure it's None on failure
-                             status_text = "🟢 ON" # Prepend standard emoji as fallback
-                        status = discord.Status.online
-                    else:
-                        # Use standard emoji when READY
-                        status_text = "⚫ READY" # Prepend standard emoji
-                        status = discord.Status.idle
+                    pump_state_str = "OFF"
 
-                # Add time info (append after emoji/state text)
-                status_text += f" | {format_time(self.bot.session_time_remaining)}"
+            # Construct activity string (adjust format as needed for length)
+            activity_string = f"{latch_str}Pump: {pump_state_str} | Sess: {session_str} | Bank: {banked_str}"
 
-            # Create CustomActivity
-            # Pass the custom emoji object (or None) to the emoji parameter
-            activity = discord.CustomActivity(
-                name=status_text,
-                emoji=custom_emoji_obj
-            )
+            # Use CustomActivity for more flexibility if needed, or Game for simplicity
+            activity = discord.Game(name=activity_string)
+            # Example with CustomActivity:
+            # activity = discord.CustomActivity(name=activity_string)
 
-            await self.bot.change_presence(activity=activity, status=status)
-
+        try:
+            await self.bot.change_presence(status=status, activity=activity)
+            logger.debug(f"Updated presence: {status}, Activity: {activity_string}")
         except Exception as e:
-            print(f"Failed to update status: {e}")
+            logger.error(f"Failed to update presence: {e}")
 
     @tasks.loop(seconds=15) # Check service less frequently, update status more often if needed
     async def service_monitor_task(self):
@@ -117,6 +91,46 @@ class MonitorCog(commands.Cog):
     async def before_service_monitor(self):
         await self.bot.wait_until_ready() # Ensure bot is ready before starting loop
 
+    @tasks.loop(seconds=1.0)
+    async def session_timer(self):
+        """Decrements session time remaining every second."""
+        if not self.bot.is_ready() or not self.bot.service_was_up:
+            return # Don't decrement if bot isn't ready or API is down
+
+        # Time is now decremented based on actual pump run time in the pump loops
+        # This timer primarily exists to update status if nothing else is happening
+        # and potentially enforce session limits if pump runs indefinitely (manual on)
+
+        # Let's check if the pump is ON according to API (if no task is running)
+        # This handles the case where pump was left ON manually
+        is_manually_on = False
+        if not (self.bot.pump_task and not self.bot.pump_task.done()):
+            pump_state = await api_request(self.bot, "pump/status")
+            if pump_state is not None and pump_state.get('is_on'):
+                is_manually_on = True
+
+        # Only decrement session time here if the pump is manually on
+        if is_manually_on:
+            if self.bot.session_time_remaining > 0:
+                update_session_time(self.bot, -1) # Decrement by 1 second
+                # No need to save state every second, pump loops handle it.
+                # If it runs out, the pump keeps running, but commands might fail.
+                if self.bot.session_time_remaining == 0:
+                    logger.info("Session time reached zero while pump was manually on.")
+                    # Optionally DM wearer when session runs out?
+                    await self.update_bot_status() # Update status immediately
+            # else: session time is already zero or less
+        # else: Pump is off or managed by a timed/banked task loop
+
+        # We might still want periodic status updates even if time isn't decrementing
+        # Maybe update status less frequently here if nothing changed?
+        # For now, let's keep it simple and rely on other actions to trigger updates.
+
+    @session_timer.before_loop
+    async def before_session_timer(self):
+        await self.bot.wait_until_ready()
+        logger.info("Session timer loop starting.")
 
 async def setup(bot):
-  await bot.add_cog(MonitorCog(bot))
+    monitor_cog = MonitorCog(bot)
+    await bot.add_cog(monitor_cog)

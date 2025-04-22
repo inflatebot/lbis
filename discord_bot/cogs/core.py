@@ -1,9 +1,8 @@
-\
 import discord
 from discord.ext import commands
 from discord import app_commands
 import aiohttp
-from utils import dm_wearer_on_use, format_time, update_session_time
+from utils import dm_wearer_on_use, format_time, update_session_time, api_request, is_wearer
 
 class CoreCog(commands.Cog):
     def __init__(self, bot):
@@ -28,48 +27,49 @@ class CoreCog(commands.Cog):
                  await interaction.response.send_message(f"An unexpected error occurred: {e}", ephemeral=True)
 
 
-    @app_commands.command(name="status", description="Check the current device status")
-    @dm_wearer_on_use("status")
-    async def device_status(self, interaction: discord.Interaction):
-        """Check the current device status"""
-        update_session_time(self.bot)  # Update session time before displaying
-
-        status_lines = []
-        pump_state_text = "Unknown"
-        service_reachable = False
-
+    @app_commands.command(name="status", description="Shows the current status of the bot and session.")
+    async def status(self, interaction: discord.Interaction):
+        """Displays the current status."""
         # Check service reachability first
+        api_status = "Unknown"
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(f"{self.bot.API_BASE_URL}/api/getPumpState", timeout=5) as response:
                     if response.status == 200:
-                        service_reachable = True
-                        state = await response.text()
-                        pump_state_text = "ON" if state == "1" else "OFF"
+                        api_status = "Reachable"
                     else:
-                         pump_state_text = f"Error ({response.status})"
+                        api_status = f"Error ({response.status})"
             except Exception:
-                 pump_state_text = "Unreachable" # Service likely down
+                api_status = "Unreachable"  # Service likely down
 
-        status_lines.append(f"🔌 Pump: {pump_state_text}")
-        status_lines.append(f"⏲️ Session: {format_time(self.bot.session_time_remaining)} remaining")
-
-        if self.bot.latch_active:
-            latch_msg = "🔒 Pump is latched"
-            if self.bot.latch_reason:
-                latch_msg += f": {self.bot.latch_reason}"
-            # Indicate if timed
-            if self.bot.latch_end_time:
-                 remaining_latch_time = self.bot.latch_end_time - asyncio.get_event_loop().time()
-                 if remaining_latch_time > 0:
-                      latch_msg += f" (expires in {format_time(remaining_latch_time)})"
-            status_lines.append(latch_msg)
+        # Session Info
+        session_time_str = format_time(self.bot.session_time_remaining)
+        banked_time_str = format_time(self.bot.banked_time)  # Added
+        latch_status = "Latched" if self.bot.latch_active else "Unlatched"
+        pump_status = "Unknown"
+        if self.bot.last_pump_time:
+            # Check if a pump task is running
+            if self.bot.pump_task and not self.bot.pump_task.done():
+                pump_status = "ON (Timed/Banked)"
+            else:
+                # Check API for actual pump state if no task is running
+                pump_state = await api_request(self.bot, "pump/status")
+                if pump_state is not None:
+                    pump_status = "ON" if pump_state.get('is_on') else "OFF"
+                else:
+                    pump_status = "OFF (API check failed)"  # Assume off if API fails and no task
         else:
-             status_lines.append("🔓 Pump is unlatched")
+            pump_status = "OFF (Never run)"
 
+        embed = discord.Embed(title="LBIS Status", color=discord.Color.blue())
+        embed.add_field(name="API Service", value=api_status, inline=False)
+        embed.add_field(name="Session Time", value=session_time_str, inline=True)
+        embed.add_field(name="Banked Time", value=banked_time_str, inline=True)  # Added
+        embed.add_field(name="Latch", value=latch_status, inline=True)
+        embed.add_field(name="Pump", value=pump_status, inline=True)
 
-        await interaction.response.send_message("\n".join(status_lines)) # Keep status public
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):
-  await bot.add_cog(CoreCog(bot))
+    await bot.add_cog(CoreCog(bot))

@@ -63,7 +63,10 @@ class lBISBot(commands.Bot):
         self.session_time_remaining = 0
         self.session_pump_start = None
         self.service_was_up = True  # Assume service is up initially
-        self.ready_note = None # Initialize ready_note
+        self.ready_note = None  # Initialize ready_note
+        self.banked_time: int = 0  # Added: Banked time in seconds
+        self.pump_task: asyncio.Task | None = None  # Added: Reference to the running pump task
+        self.pump_task_end_time: float | None = None  # Added: Target end time for the pump task
 
         # Load persistent state
         utils.load_session_state(self)  # Pass self (the bot instance)
