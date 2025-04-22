@@ -3,6 +3,7 @@
 .vscode/settings.json
 micropython/
 bot.json
+discord_bot/session.json
 session.json
 discord_bot/__pycache__/
 discord_bot/cogs/__pycache__/
