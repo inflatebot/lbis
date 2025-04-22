@@ -113,22 +113,6 @@ class AdminCog(commands.Cog):
         else:
              await interaction.response.send_message(f"Pump is now {status_message}.", ephemeral=True)
 
-    @app_commands.command(name="setnote", description="Set or clear a note shown in the status when READY (wearer only).")
-    @app_commands.check(is_wearer)
-    @app_commands.describe(note="The note to display (max 50 chars). Leave blank to clear.")
-    async def setnote(self, interaction: discord.Interaction, note: app_commands.Range[str, 0, 50] = None):
-        """Set or clear a note shown in the status when READY (wearer only)."""
-        if note:
-            self.bot.ready_note = note
-            response_message = f"Ready note set to: \"{note}\""
-        else:
-            self.bot.ready_note = None
-            response_message = "Ready note cleared."
-
-        save_session_state(self.bot)
-        await self.bot.request_status_update() # Use bot method
-        await interaction.response.send_message(response_message, ephemeral=True)
-
     @app_commands.command(name="bank_time", description="[Wearer Only] Manually add time to the bank.")
     @app_commands.check(is_wearer)
     @app_commands.describe(seconds="Number of seconds to add to the bank.")
@@ -173,7 +157,6 @@ class AdminCog(commands.Cog):
     @restart.error
     @latch.error
     @set_wearer.error # Although set_wearer doesn't use the check, catch other potential errors
-    @setnote.error # Add error handler for setnote
     async def admin_error(self, interaction: discord.Interaction, error):
         if isinstance(error, app_commands.errors.CheckFailure):
             await interaction.response.send_message("Only the device wearer can use this command.", ephemeral=True)

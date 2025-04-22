@@ -37,8 +37,6 @@ def load_session_state(bot):
     # Ensure these are always present after loading state
     if not hasattr(bot, 'latch_timer'):
         bot.latch_timer = None
-    if not hasattr(bot, 'ready_note'):
-        bot.ready_note = None
     if not hasattr(bot, 'pump_task'):
         bot.pump_task = None
     if not hasattr(bot, 'pump_task_end_time'):
