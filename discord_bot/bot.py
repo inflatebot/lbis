@@ -71,6 +71,16 @@ class lBISBot(commands.Bot):
         # Load persistent state
         utils.load_session_state(self)  # Pass self (the bot instance)
 
+    async def request_status_update(self):
+        """Requests the MonitorCog to update the bot's presence."""
+        monitor_cog = self.get_cog('MonitorCog')
+        if monitor_cog:
+            # Use create_task to avoid blocking if the update takes time
+            asyncio.create_task(monitor_cog.update_bot_status())
+        else:
+            # Log if the cog isn't loaded for some reason
+            logging.warning("Tried to request status update, but MonitorCog is not loaded.")
+
     async def setup_hook(self):
         # Load Cogs
         cogs_dir = "cogs"

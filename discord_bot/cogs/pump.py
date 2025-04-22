@@ -76,9 +76,7 @@ class PumpCog(commands.Cog):
 
             save_session_state(self.bot)
 
-            monitor_cog = self.bot.get_cog("MonitorCog")
-            if monitor_cog:
-                await monitor_cog.update_bot_status()
+            await self.bot.request_status_update()
 
             if interrupted:
                 logger.warning(f"Timed pump interrupted due to: {interruption_reason}. Ran for {format_time(int(actual_run_duration))}.")
@@ -161,9 +159,7 @@ class PumpCog(commands.Cog):
 
             save_session_state(self.bot)
 
-            monitor_cog = self.bot.get_cog("MonitorCog")
-            if monitor_cog:
-                await monitor_cog.update_bot_status()
+            await self.bot.request_status_update()
 
             if interrupted:
                 logger.warning(f"Banked pump interrupted due to: {interruption_reason}. Ran for {format_time(int(actual_run_duration))}, consumed {format_time(decremented_bank)} bank & session time.")
@@ -250,9 +246,7 @@ class PumpCog(commands.Cog):
                     response_message += f" (Limited by session time)."
                 await interaction.response.send_message(response_message)
 
-                monitor_cog = self.bot.get_cog("MonitorCog")
-                if monitor_cog:
-                    await monitor_cog.update_bot_status()
+                await self.bot.request_status_update()
             else:
                 await interaction.response.send_message("Failed to start pump via API.", ephemeral=True)
 
@@ -304,9 +298,7 @@ class PumpCog(commands.Cog):
                 response_message += f" (Limited by bank, session time, or max duration)."
             await interaction.response.send_message(response_message)
 
-            monitor_cog = self.bot.get_cog("MonitorCog")
-            if monitor_cog:
-                await monitor_cog.update_bot_status()
+            await self.bot.request_status_update()
         else:
             await interaction.response.send_message("Failed to start pump via API.", ephemeral=True)
 
@@ -322,9 +314,7 @@ class PumpCog(commands.Cog):
             self.bot.last_pump_time = time.time()
             save_session_state(self.bot)
             await interaction.response.send_message("Pump turned ON.", ephemeral=True)
-            monitor_cog = self.bot.get_cog("MonitorCog")
-            if monitor_cog:
-                await monitor_cog.update_bot_status()
+            await self.bot.request_status_update()
         else:
             await interaction.response.send_message("Failed to turn pump ON via API.", ephemeral=True)
 
@@ -340,9 +330,7 @@ class PumpCog(commands.Cog):
             self.bot.last_pump_time = time.time()
             save_session_state(self.bot)
             await interaction.response.send_message("Pump turned OFF.", ephemeral=True)
-            monitor_cog = self.bot.get_cog("MonitorCog")
-            if monitor_cog:
-                await monitor_cog.update_bot_status()
+            await self.bot.request_status_update()
         else:
             await interaction.response.send_message("Failed to turn pump OFF via API.", ephemeral=True)
 

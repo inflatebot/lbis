@@ -12,12 +12,6 @@ class AdminCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def update_status(self):
-        """Helper to trigger status update"""
-        monitor_cog = self.bot.get_cog('MonitorCog')
-        if monitor_cog:
-            await monitor_cog.update_bot_status()
-
     @app_commands.command(name="restart", description="Restart the server (wearer only)")
     @app_commands.check(is_wearer)
     @dm_wearer_on_use("restart")
@@ -38,7 +32,6 @@ class AdminCog(commands.Cog):
             except Exception as e:
                  await interaction.followup.send(f"An error occurred sending restart command: {e}", ephemeral=True)
 
-
     @app_commands.command(name="set_wearer", description="Register yourself as this device's wearer (DM only, requires secret)")
     @app_commands.describe(secret="Your secret")
     async def set_wearer(self, interaction: discord.Interaction, secret: str):
@@ -51,7 +44,7 @@ class AdminCog(commands.Cog):
         if secret == self.bot.config.get("wearer_secret"):
             self.bot.OWNER_ID = interaction.user.id
             save_wearer_id(self.bot, interaction.user.id) # Pass bot object
-            await self.update_status()
+            await self.bot.request_status_update() # Use bot method
             await interaction.response.send_message("You are now registered as this device's wearer!", ephemeral=True)
         else:
             await interaction.response.send_message("Incorrect secret.", ephemeral=True)
@@ -113,13 +106,12 @@ class AdminCog(commands.Cog):
              self.bot.latch_reason = None # Clear reason when unlatching
 
         save_session_state(self.bot)
-        await self.update_status()
+        await self.bot.request_status_update() # Use bot method
         # Use followup if we sent a warning message before
         if interaction.response.is_done():
              await interaction.followup.send(f"Pump is now {status_message}.", ephemeral=True)
         else:
              await interaction.response.send_message(f"Pump is now {status_message}.", ephemeral=True)
-
 
     @app_commands.command(name="setnote", description="Set or clear a note shown in the status when READY (wearer only).")
     @app_commands.check(is_wearer)
@@ -134,7 +126,7 @@ class AdminCog(commands.Cog):
             response_message = "Ready note cleared."
 
         save_session_state(self.bot)
-        await self.update_status()
+        await self.bot.request_status_update() # Use bot method
         await interaction.response.send_message(response_message, ephemeral=True)
 
     @app_commands.command(name="bank_time", description="[Wearer Only] Manually add time to the bank.")
@@ -159,10 +151,8 @@ class AdminCog(commands.Cog):
             f"Total banked time is now {format_time(self.bot.banked_time)}.",
             ephemeral=True
         )
-        # Optionally update status immediately
-        monitor_cog = self.bot.get_cog("MonitorCog")
-        if monitor_cog:
-            await monitor_cog.update_bot_status() # type: ignore
+        # Use bot method for status update
+        await self.bot.request_status_update()
 
     @app_commands.command(name="reset_bank", description="[Wearer Only] Resets the banked time to zero.")
     @app_commands.check(is_wearer)
@@ -177,10 +167,8 @@ class AdminCog(commands.Cog):
             f"Banked time has been reset to 0 (was {format_time(old_banked_time)}).",
             ephemeral=True
         )
-        # Update status
-        monitor_cog = self.bot.get_cog("MonitorCog")
-        if monitor_cog:
-            await monitor_cog.update_bot_status() # type: ignore
+        # Use bot method for status update
+        await self.bot.request_status_update()
 
     @restart.error
     @latch.error
