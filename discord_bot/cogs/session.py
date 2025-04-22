@@ -29,7 +29,6 @@ class SessionCog(commands.Cog):
             await interaction.response.send_message(f"Cannot add more than {max_extension//60} minutes at once (configurable limit).", ephemeral=True)
             return
 
-        update_session_time(self.bot)  # Update current time first
         self.bot.session_time_remaining += (minutes * 60)
         save_session_state(self.bot)
         await self.update_status()
@@ -50,7 +49,6 @@ class SessionCog(commands.Cog):
     @app_commands.command(name="session_time", description="Check remaining session time")
     async def check_time(self, interaction: discord.Interaction):
         """Check remaining session time"""
-        update_session_time(self.bot)
         await interaction.response.send_message(f"Session time remaining: {format_time(self.bot.session_time_remaining)}", ephemeral=True)
 
     @app_commands.command(name="set_time", description="Set the session timer to a specific value (wearer only)")

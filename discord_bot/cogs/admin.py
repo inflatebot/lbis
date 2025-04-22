@@ -81,7 +81,7 @@ class AdminCog(commands.Cog):
 
         # If latching, ensure pump is off
         if new_state:
-            update_session_time(self.bot) # Update time before turning off pump
+            # async with aiohttp.ClientSession() as session:
             async with aiohttp.ClientSession() as session:
                 try:
                     async with session.post(

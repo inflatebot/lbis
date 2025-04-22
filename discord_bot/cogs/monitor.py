@@ -2,14 +2,21 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 import asyncio
-import logging  # Added
+import logging
 from utils import format_time, api_request, save_session_state, update_session_time
 
-logger = logging.getLogger(__name__)  # Added
+logger = logging.getLogger(__name__)
 
 class MonitorCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        # Initialize device_base_url using the main API URL
+        self.bot.device_base_url = self.bot.API_BASE_URL
+        if not self.bot.device_base_url:
+            logger.warning("API base URL not found in config! Monitoring tasks might fail.")
+        else:
+            logger.info(f"API base URL loaded: {self.bot.device_base_url}")
+
         self.service_monitor_task.start()
         self.session_timer.start()
 
@@ -26,28 +33,47 @@ class MonitorCog(commands.Cog):
         else:
             status = discord.Status.online
             session_str = format_time(self.bot.session_time_remaining)
-            banked_str = format_time(self.bot.banked_time) # Added
+            banked_str = format_time(self.bot.banked_time)
             latch_str = "🔒" if self.bot.latch_active else ""
 
             pump_state_str = ""
-            # Check if a task is running first
             if self.bot.pump_task and not self.bot.pump_task.done():
                 pump_state_str = "ON"
             else:
-                # If no task, check API (best effort)
-                pump_state = await api_request(self.bot, "pump/status")
-                if pump_state is not None and pump_state.get('is_on'):
-                    pump_state_str = "ON"
+                if not self.bot.device_base_url:
+                    logger.error("Device API base URL not configured. Cannot monitor pump status.")
+                    pump_state_str = "UNKNOWN"
                 else:
-                    pump_state_str = "OFF"
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            status_url = f"{self.bot.device_base_url}/api/getPumpState"
+                            logger.debug(f"Checking pump status at: {status_url}")
+                            async with session.get(status_url) as response:
+                                if response.status == 200:
+                                    # Try to parse as text first since the API returns "0" or "1"
+                                    text = await response.text()
+                                    try:
+                                        # Convert text to boolean
+                                        is_on = bool(int(text))
+                                        pump_state_str = "ON" if is_on else "OFF"
+                                    except ValueError:
+                                        # If text->int conversion fails, try JSON as fallback
+                                        try:
+                                            pump_state = await response.json()
+                                            pump_state_str = "ON" if pump_state.get('is_on') else "OFF"
+                                        except:
+                                            logger.error(f"Failed to parse pump state from response: {text}")
+                                            pump_state_str = "UNKNOWN"
+                                else:
+                                    logger.error(f"API request to {status_url} failed with status {response.status}")
+                                    pump_state_str = "UNKNOWN"
+                    except Exception as e:
+                        logger.error(f"Failed to check pump status: {e}")
+                        pump_state_str = "UNKNOWN"
 
-            # Construct activity string (adjust format as needed for length)
             activity_string = f"{latch_str}Pump: {pump_state_str} | Sess: {session_str} | Bank: {banked_str}"
-
-            # Use CustomActivity for more flexibility if needed, or Game for simplicity
-            activity = discord.Game(name=activity_string)
-            # Example with CustomActivity:
-            # activity = discord.CustomActivity(name=activity_string)
+            # Use CustomActivity instead of Game
+            activity = discord.CustomActivity(name=activity_string)
 
         try:
             await self.bot.change_presence(status=status, activity=activity)
@@ -55,7 +81,7 @@ class MonitorCog(commands.Cog):
         except Exception as e:
             logger.error(f"Failed to update presence: {e}")
 
-    @tasks.loop(seconds=15) # Check service less frequently, update status more often if needed
+    @tasks.loop(seconds=15)
     async def service_monitor_task(self):
         """Background task to monitor service availability and update status"""
         was_previously_up = self.bot.service_was_up
@@ -72,12 +98,10 @@ class MonitorCog(commands.Cog):
                             except Exception as e:
                                 print(f"Failed to DM wearer about service up: {e}")
                     else:
-                        # Treat non-200 as down
                         raise Exception(f"Non-200 status: {resp.status}")
         except Exception as e:
-            # Any exception means service is likely down
-            if was_previously_up: # Only notify on the transition to down
-                 print(f"Service check failed: {e}") # Log the error
+            if was_previously_up:
+                 print(f"Service check failed: {e}")
                  if self.bot.OWNER_ID:
                     try:
                         wearer = await self.bot.fetch_user(self.bot.OWNER_ID)
@@ -87,47 +111,56 @@ class MonitorCog(commands.Cog):
                         print(f"Failed to DM wearer about service down: {notify_e}")
             self.bot.service_was_up = False
 
-        # Update bot status regardless of reachability change
         await self.update_bot_status()
 
     @service_monitor_task.before_loop
     async def before_service_monitor(self):
-        await self.bot.wait_until_ready() # Ensure bot is ready before starting loop
+        await self.bot.wait_until_ready()
 
     @tasks.loop(seconds=1.0)
     async def session_timer(self):
         """Decrements session time remaining every second."""
         if not self.bot.is_ready() or not self.bot.service_was_up:
-            return # Don't decrement if bot isn't ready or API is down
+            return
 
-        # Time is now decremented based on actual pump run time in the pump loops
-        # This timer primarily exists to update status if nothing else is happening
-        # and potentially enforce session limits if pump runs indefinitely (manual on)
+        if not self.bot.device_base_url:
+            logger.warning("Device base URL not set, cannot enforce pump state for session timer.")
 
-        # Let's check if the pump is ON according to API (if no task is running)
-        # This handles the case where pump was left ON manually
         is_manually_on = False
         if not (self.bot.pump_task and not self.bot.pump_task.done()):
-            pump_state = await api_request(self.bot, "pump/status")
-            if pump_state is not None and pump_state.get('is_on'):
-                is_manually_on = True
+            if not self.bot.device_base_url:
+                logger.error("Device API base URL not configured. Cannot monitor pump status.")
+            else:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        status_url = f"{self.bot.device_base_url}/api/getPumpState"
+                        logger.debug(f"Checking pump status at: {status_url}")
+                        async with session.get(status_url) as response:
+                            if response.status == 200:
+                                # Try to parse as text first since the API returns "0" or "1"
+                                text = await response.text()
+                                try:
+                                    # Convert text to boolean
+                                    is_on = bool(int(text))
+                                    is_manually_on = is_on
+                                except ValueError:
+                                    # If text->int conversion fails, try JSON as fallback
+                                    try:
+                                        pump_state = await response.json()
+                                        is_manually_on = pump_state.get('is_on', False)
+                                    except:
+                                        logger.error(f"Failed to parse pump state from response: {text}")
+                            else:
+                                logger.error(f"API request to {status_url} failed with status {response.status}")
+                except Exception as e:
+                    logger.error(f"Failed to check pump status: {e}")
 
-        # Only decrement session time here if the pump is manually on
         if is_manually_on:
             if self.bot.session_time_remaining > 0:
-                update_session_time(self.bot, -1) # Decrement by 1 second
-                # No need to save state every second, pump loops handle it.
-                # If it runs out, the pump keeps running, but commands might fail.
+                update_session_time(self.bot, -1)
                 if self.bot.session_time_remaining == 0:
                     logger.info("Session time reached zero while pump was manually on.")
-                    # Optionally DM wearer when session runs out?
-                    await self.update_bot_status() # Update status immediately
-            # else: session time is already zero or less
-        # else: Pump is off or managed by a timed/banked task loop
-
-        # We might still want periodic status updates even if time isn't decrementing
-        # Maybe update status less frequently here if nothing changed?
-        # For now, let's keep it simple and rely on other actions to trigger updates.
+                    await self.update_bot_status()
 
     @session_timer.before_loop
     async def before_session_timer(self):
