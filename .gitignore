@@ -1,6 +1,7 @@
 .editorconfig
 .vscode/extensions.json
 .vscode/settings.json
+firmware/.vscode/
 micropython/
 discord_bot/bot.json
 bot.json
