@@ -172,7 +172,7 @@ class PumpCog(commands.Cog):
 
     @app_commands.command(name="pump_timed", description="Runs the pump for a specific duration.")
     @app_commands.describe(minutes="Number of minutes to run the pump.")
-    @dm_wearer_on_use
+    @dm_wearer_on_use("pump_timed")
     async def pump_timed(self, interaction: discord.Interaction, minutes: int):
         seconds = minutes * 60
         max_pump_duration = self.bot.config.get('max_pump_duration', 60)
@@ -254,7 +254,7 @@ class PumpCog(commands.Cog):
 
     @app_commands.command(name="pump_banked", description="Runs the pump using banked time.")
     @app_commands.describe(minutes="Maximum number of minutes to run using banked time.")
-    @dm_wearer_on_use
+    @dm_wearer_on_use("pump_banked")
     async def pump_banked(self, interaction: discord.Interaction, minutes: int):
         seconds = minutes * 60
         max_pump_duration = self.bot.config.get('max_pump_duration', 60)
@@ -308,6 +308,7 @@ class PumpCog(commands.Cog):
 
     @app_commands.command(name="pump_on", description="[Wearer Only] Manually turns the pump on indefinitely.")
     @app_commands.check(is_wearer)
+    @dm_wearer_on_use("pump_on")
     async def pump_on(self, interaction: discord.Interaction):
         if self.bot.pump_task and not self.bot.pump_task.done():
             self.bot.pump_task.cancel()
@@ -325,6 +326,7 @@ class PumpCog(commands.Cog):
 
     @app_commands.command(name="pump_off", description="[Wearer Only] Manually turns the pump off.")
     @app_commands.check(is_wearer)
+    @dm_wearer_on_use("pump_off")
     async def pump_off(self, interaction: discord.Interaction):
         if self.bot.pump_task and not self.bot.pump_task.done():
             self.bot.pump_task.cancel()

@@ -2,7 +2,10 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 import asyncio
+import logging  # Added
 from utils import format_time, api_request, save_session_state, update_session_time
+
+logger = logging.getLogger(__name__)  # Added
 
 class MonitorCog(commands.Cog):
     def __init__(self, bot):

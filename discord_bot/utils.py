@@ -6,9 +6,11 @@ import functools
 import os
 import logging
 import time  # Added
+import aiohttp  # Added for API requests
 
 # --- Constants ---
-SESSION_FILE = "discord_bot/session.json"
+_utils_dir = os.path.dirname(os.path.abspath(__file__))  # Get directory of utils.py
+SESSION_FILE = os.path.join(_utils_dir, "session.json")  # Path relative to utils.py
 logger = logging.getLogger(__name__)
 
 # --- Time Formatting ---
@@ -48,13 +50,19 @@ def save_session_state(bot):
         'default_session_time': bot.default_session_time,
         'banked_time': bot.banked_time, # Added
     }
-    with open(SESSION_FILE, 'w') as f:
-        json.dump(state, f)
+    # Use the absolute path defined in SESSION_FILE
+    try:
+        with open(SESSION_FILE, 'w') as f:
+            json.dump(state, f, indent=4)  # Added indent for readability
+        logger.debug(f"Session state saved to {SESSION_FILE}")
+    except IOError as e:
+        logger.error(f"Failed to save session state to {SESSION_FILE}: {e}")
 
 def load_session_state(bot):
     """Loads session state from a file and initializes bot attributes."""
     default_initial_time = bot.config.get('max_session_time', 1800) # Default to max_session or 30min
     try:
+        # Use the absolute path defined in SESSION_FILE
         with open(SESSION_FILE, 'r') as f:
             state = json.load(f)
             bot.session_time_remaining = state.get('session_time_remaining', 0)
@@ -65,9 +73,9 @@ def load_session_state(bot):
             bot.pump_state = state.get('pump_state', False)
             bot.default_session_time = state.get('default_session_time', default_initial_time)
             bot.banked_time = state.get('banked_time', 0) # Added
-            logger.info("Session state loaded.")
+            logger.info(f"Session state loaded from {SESSION_FILE}.")
     except FileNotFoundError:
-        print("Session state file not found. Initializing with defaults.")
+        logger.warning(f"Session state file not found at {SESSION_FILE}. Initializing with defaults.")
         bot.session_time_remaining = 0
         bot.last_session_update = None
         bot.session_pump_start = None
@@ -76,9 +84,9 @@ def load_session_state(bot):
         bot.pump_state = False
         bot.default_session_time = default_initial_time
         bot.banked_time = 0 # Added
-        save_session_state(bot) # Create the file with defaults
+        save_session_state(bot) # Create the file with defaults using the correct path
     except (IOError, json.JSONDecodeError) as e:
-        print(f"Error loading session state: {e}")
+        logger.error(f"Error loading session state from {SESSION_FILE}: {e}")
         bot.session_time_remaining = 0
         bot.last_session_update = None
         bot.session_pump_start = None
@@ -181,4 +189,53 @@ def dm_wearer_on_use(command_name):
             return await func(cog_instance, interaction, *args, **kwargs)
         return wrapper
     return decorator
+
+# --- API Interaction ---
+
+async def api_request(bot, endpoint: str, method: str = "GET", data: dict = None, timeout: int = 5) -> dict | None:
+    """
+    Make a request to the lBIS API.
+    
+    Args:
+        bot: The bot instance containing API_BASE_URL
+        endpoint: API endpoint (without leading slash)
+        method: HTTP method (GET/POST)
+        data: Optional data to send with request
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Response data as dict if successful and response has data
+        None if request failed or had no data
+    """
+    url = f"{bot.API_BASE_URL}/api/{endpoint}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            kwargs = {
+                'timeout': timeout
+            }
+            if data:
+                kwargs['json'] = data
+            
+            async with getattr(session, method.lower())(url, **kwargs) as resp:
+                if resp.status != 200:
+                    logger.warning(f"API request to {endpoint} failed with status {resp.status}")
+                    return None
+                    
+                try:
+                    return await resp.json()
+                except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                    # For endpoints that return plain text
+                    text = await resp.text()
+                    try:
+                        # Try to handle numeric responses
+                        return {"value": int(text)}
+                    except ValueError:
+                        return {"message": text}
+                        
+    except asyncio.TimeoutError:
+        logger.warning(f"API request to {endpoint} timed out after {timeout}s")
+    except Exception as e:
+        logger.error(f"API request to {endpoint} failed with error: {e}")
+    
+    return None
 

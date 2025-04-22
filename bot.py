@@ -7,6 +7,8 @@ import json
 import functools
 import asyncio
 
+# THIS FILE IS DEPRECATED. PLEASE SEE THE UPDATED ONE IN discord_bot/bot.py
+
 # lBIS Discord Bot Reference Implementation
 # This bot was 100% vibe-coded with GPT4.1 and Claude 3.5 Sonnet. It is not intended to be stable, secure, or sensible.
 # While you are able to latch your lBIS to prevent Shenanigans, you definitely shouldn't invite this bot to any public servers because ANYBODY can use the commands!!
