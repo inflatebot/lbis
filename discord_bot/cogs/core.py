@@ -78,7 +78,7 @@ class CoreCog(commands.Cog):
         else:
             pump_status = "OFF (Never run)"
 
-        embed = discord.Embed(title="LBIS Status", color=discord.Color.blue())
+        embed = discord.Embed(title="lBIS Status", color=discord.Color.blue())
         embed.add_field(name="API Service", value=api_status, inline=False)
         embed.add_field(name="Session Time", value=session_time_str, inline=True)
         embed.add_field(name="Banked Time", value=banked_time_str, inline=True)
