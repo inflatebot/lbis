@@ -63,7 +63,7 @@ class PumpCog(commands.Cog):
             interruption_reason = "cancelled"
         finally:
             logger.info("Timed pump loop cleanup.")
-            if await api_request(self.bot, "pump/off", method="POST"):
+            if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
                 logger.info("Pump turned off via API after timed session.")
                 self.bot.last_pump_time = time.time()
             else:
@@ -148,7 +148,7 @@ class PumpCog(commands.Cog):
             interruption_reason = "cancelled"
         finally:
             logger.info("Banked pump loop cleanup.")
-            if await api_request(self.bot, "pump/off", method="POST"):
+            if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
                 logger.info("Pump turned off via API after banked session.")
                 self.bot.last_pump_time = time.time()
             else:
@@ -170,15 +170,18 @@ class PumpCog(commands.Cog):
             else:
                 logger.info(f"Banked pump completed successfully. Ran for {format_time(int(actual_run_duration))}, consumed {format_time(decremented_bank)} bank & session time.")
 
-    @app_commands.command(name="pump_timed", description="Runs the pump for a specific duration.")
-    @app_commands.describe(minutes="Number of minutes to run the pump.")
+    @app_commands.command(name="pump_timed", description="Runs the pump for a specific duration in seconds.")
+    @app_commands.describe(seconds="Number of seconds to run the pump (max configured in bot.json).")
     @dm_wearer_on_use("pump_timed")
-    async def pump_timed(self, interaction: discord.Interaction, minutes: int):
-        seconds = minutes * 60
+    async def pump_timed(self, interaction: discord.Interaction, seconds: int):
         max_pump_duration = self.bot.config.get('max_pump_duration', 60)
 
         if seconds <= 0:
-            await interaction.response.send_message("Please provide a positive duration.", ephemeral=True)
+            await interaction.response.send_message("Please provide a positive duration in seconds.", ephemeral=True)
+            return
+
+        if seconds > max_pump_duration:
+            await interaction.response.send_message(f"Maximum duration allowed is {max_pump_duration} seconds (configurable via 'max_pump_duration' in bot.json).", ephemeral=True)
             return
 
         if self.bot.latch_active:
@@ -197,11 +200,12 @@ class PumpCog(commands.Cog):
         if self.bot.pump_task and not self.bot.pump_task.done():
             logger.info(f"Pump task already running. Extending timer.")
             remaining_current = max(0, self.bot.pump_task_end_time - current_time)
-            new_total_req = remaining_current + seconds
             max_possible_additional = max(0, self.bot.session_time_remaining - remaining_current)
-            max_possible_duration = min(remaining_current + max_possible_additional, max_pump_duration)
+            effective_max_duration_for_extension = min(remaining_current + max_possible_additional, max_pump_duration)
 
-            time_to_add = max(0, max_possible_duration - remaining_current)
+            time_to_add = max(0, effective_max_duration_for_extension - remaining_current)
+            time_to_add = min(time_to_add, seconds)
+
             overflow = max(0, seconds - time_to_add)
 
             banked_amount = 0
@@ -218,8 +222,8 @@ class PumpCog(commands.Cog):
 
             response_message = f"Pump timer already running. Extended by {format_time(int(time_to_add))}."
             if banked_amount > 0:
-                response_message += f" Banked {format_time(banked_amount)} overflow (max session/pump duration reached)."
-            if time_to_add < seconds and banked_amount == 0:
+                response_message += f" Banked {format_time(banked_amount)} overflow (max session/pump duration or input limit reached)."
+            elif time_to_add < seconds:
                 response_message += f" Could not add full duration due to session/pump limits."
 
             await interaction.response.send_message(response_message)
@@ -229,21 +233,21 @@ class PumpCog(commands.Cog):
                 await interaction.response.send_message("No session time remaining.", ephemeral=True)
                 return
 
-            run_seconds = min(seconds, self.bot.session_time_remaining, max_pump_duration)
+            run_seconds = min(seconds, self.bot.session_time_remaining)
 
             if run_seconds <= 0:
-                await interaction.response.send_message("Cannot run pump (calculated duration is zero).", ephemeral=True)
+                await interaction.response.send_message("Cannot run pump (calculated duration is zero, likely no session time).", ephemeral=True)
                 return
 
             logger.info(f"Starting new timed pump for {run_seconds}s.")
-            if await api_request(self.bot, "pump/on", method="POST"):
+            if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 1}):
                 self.bot.last_pump_time = time.time()
                 self.bot.pump_task_end_time = current_time + run_seconds
                 self.bot.pump_task = asyncio.create_task(self._timed_pump_loop(run_seconds))
 
                 response_message = f"Pump started for {format_time(run_seconds)}."
                 if run_seconds < seconds:
-                    response_message += f" (Limited by session time or max duration)."
+                    response_message += f" (Limited by session time)."
                 await interaction.response.send_message(response_message)
 
                 monitor_cog = self.bot.get_cog("MonitorCog")
@@ -290,7 +294,7 @@ class PumpCog(commands.Cog):
             return
 
         logger.info(f"Starting banked pump for {run_seconds}s.")
-        if await api_request(self.bot, "pump/on", method="POST"):
+        if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 1}):
             self.bot.last_pump_time = time.time()
             self.bot.pump_task_end_time = asyncio.get_event_loop().time() + run_seconds
             self.bot.pump_task = asyncio.create_task(self._banked_pump_loop(run_seconds))
@@ -314,7 +318,7 @@ class PumpCog(commands.Cog):
             self.bot.pump_task.cancel()
             logger.info("Cancelled running pump task due to manual pump_on.")
 
-        if await api_request(self.bot, "pump/on", method="POST"):
+        if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 1}):
             self.bot.last_pump_time = time.time()
             save_session_state(self.bot)
             await interaction.response.send_message("Pump turned ON.", ephemeral=True)
@@ -332,7 +336,7 @@ class PumpCog(commands.Cog):
             self.bot.pump_task.cancel()
             logger.info("Cancelled running pump task due to manual pump_off.")
 
-        if await api_request(self.bot, "pump/off", method="POST"):
+        if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
             self.bot.last_pump_time = time.time()
             save_session_state(self.bot)
             await interaction.response.send_message("Pump turned OFF.", ephemeral=True)
