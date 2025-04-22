@@ -17,7 +17,7 @@ class CoreCog(commands.Cog):
                 async with session.get(f"{self.bot.API_BASE_URL}/api/marco", timeout=5) as response:
                     if response.status == 200:
                         data = await response.text()
-                        await interaction.response.send_message(f"Server says: {data}")
+                        await interaction.response.send_message(f"Server says: {data}", ephemeral=True)
                     else:
                         await interaction.response.send_message(f"Server responded with status {response.status}", ephemeral=True)
             except asyncio.TimeoutError:
@@ -68,7 +68,7 @@ class CoreCog(commands.Cog):
              status_lines.append("🔓 Pump is unlatched")
 
 
-        await interaction.response.send_message("\n".join(status_lines))
+        await interaction.response.send_message("\n".join(status_lines)) # Keep status public
 
 
 async def setup(bot):

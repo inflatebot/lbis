@@ -21,20 +21,20 @@ class AdminCog(commands.Cog):
     @dm_wearer_on_use("restart")
     async def restart(self, interaction: discord.Interaction):
         """Restart the server (wearer only)"""
-        await interaction.response.defer(thinking=True) # Acknowledge interaction
+        await interaction.response.defer(thinking=True, ephemeral=True) # Acknowledge interaction ephemerally
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(f"{self.bot.API_BASE_URL}/api/restart", timeout=10) as response:
                     # Response might be inconsistent on restart, primarily check reachability
-                    await interaction.followup.send("Restart command sent. Server may become temporarily unavailable.")
+                    await interaction.followup.send("Restart command sent. Server may become temporarily unavailable.", ephemeral=True)
                     # Optionally: Trigger a status update check after a short delay
                     # asyncio.create_task(self.delayed_status_update(5))
             except asyncio.TimeoutError:
-                 await interaction.followup.send("Restart command sent, but no response received (server might be restarting).")
+                 await interaction.followup.send("Restart command sent, but no response received (server might be restarting).", ephemeral=True)
             except aiohttp.ClientConnectorError:
-                 await interaction.followup.send("Failed to reach server to send restart command.")
+                 await interaction.followup.send("Failed to reach server to send restart command.", ephemeral=True)
             except Exception as e:
-                 await interaction.followup.send(f"An error occurred sending restart command: {e}")
+                 await interaction.followup.send(f"An error occurred sending restart command: {e}", ephemeral=True)
 
 
     @app_commands.command(name="set_wearer", description="Register yourself as this device's wearer (DM only, requires secret)")
@@ -50,7 +50,7 @@ class AdminCog(commands.Cog):
             self.bot.OWNER_ID = interaction.user.id
             save_wearer_id(self.bot, interaction.user.id) # Pass bot object
             await self.update_status()
-            await interaction.response.send_message("You are now registered as this device's wearer!")
+            await interaction.response.send_message("You are now registered as this device's wearer!", ephemeral=True)
         else:
             await interaction.response.send_message("Incorrect secret.", ephemeral=True)
 
@@ -114,9 +114,9 @@ class AdminCog(commands.Cog):
         await self.update_status()
         # Use followup if we sent a warning message before
         if interaction.response.is_done():
-             await interaction.followup.send(f"Pump is now {status_message}.")
+             await interaction.followup.send(f"Pump is now {status_message}.", ephemeral=True)
         else:
-             await interaction.response.send_message(f"Pump is now {status_message}.")
+             await interaction.response.send_message(f"Pump is now {status_message}.", ephemeral=True)
 
 
     @app_commands.command(name="setnote", description="Set or clear a note shown in the status when READY (wearer only).")

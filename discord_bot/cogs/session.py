@@ -33,7 +33,7 @@ class SessionCog(commands.Cog):
         self.bot.session_time_remaining += (minutes * 60)
         save_session_state(self.bot)
         await self.update_status()
-        await interaction.response.send_message(f"Added {minutes} minutes to session. {format_time(self.bot.session_time_remaining)} remaining.")
+        await interaction.response.send_message(f"Added {minutes} minutes to session. {format_time(self.bot.session_time_remaining)} remaining.", ephemeral=True)
 
     @app_commands.command(name="reset_time", description="Reset the session timer to the default duration (wearer only)")
     @app_commands.check(is_wearer)
@@ -45,13 +45,13 @@ class SessionCog(commands.Cog):
         save_session_state(self.bot)
         await self.update_status()
         # Update the response message
-        await interaction.response.send_message(f"Session timer has been reset to the default: {format_time(self.bot.session_time_remaining)}.")
+        await interaction.response.send_message(f"Session timer has been reset to the default: {format_time(self.bot.session_time_remaining)}.", ephemeral=True)
 
     @app_commands.command(name="session_time", description="Check remaining session time")
     async def check_time(self, interaction: discord.Interaction):
         """Check remaining session time"""
         update_session_time(self.bot)
-        await interaction.response.send_message(f"Session time remaining: {format_time(self.bot.session_time_remaining)}")
+        await interaction.response.send_message(f"Session time remaining: {format_time(self.bot.session_time_remaining)}", ephemeral=True)
 
     @app_commands.command(name="set_time", description="Set the session timer to a specific value (wearer only)")
     @app_commands.check(is_wearer)
@@ -75,7 +75,7 @@ class SessionCog(commands.Cog):
         self.bot.session_pump_start = None # Clear pump start if setting time manually
         save_session_state(self.bot)
         await self.update_status()
-        await interaction.response.send_message(f"Session time set to {format_time(self.bot.session_time_remaining)}.")
+        await interaction.response.send_message(f"Session time set to {format_time(self.bot.session_time_remaining)}.", ephemeral=True)
 
     @add_time.error
     @reset_time.error

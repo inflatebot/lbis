@@ -46,7 +46,7 @@ class PumpCog(commands.Cog):
                     if response.status == 200:
                         start_pump_timer(self.bot)
                         await self.update_status()
-                        await interaction.response.send_message(f"Pump turned ON! {format_time(self.bot.session_time_remaining)} remaining.")
+                        await interaction.response.send_message(f"Pump turned ON! {format_time(self.bot.session_time_remaining)} remaining.", ephemeral=True)
                     else:
                         await interaction.response.send_message(f"Failed to turn pump on. Server status: {response.status}", ephemeral=True)
             except Exception as e:
@@ -67,7 +67,7 @@ class PumpCog(commands.Cog):
                 ) as response:
                     if response.status == 200:
                         await self.update_status()
-                        await interaction.response.send_message(f"Pump turned OFF! {format_time(self.bot.session_time_remaining)} remaining.")
+                        await interaction.response.send_message(f"Pump turned OFF! {format_time(self.bot.session_time_remaining)} remaining.", ephemeral=True)
                     else:
                         await interaction.response.send_message(f"Failed to turn pump off. Server status: {response.status}", ephemeral=True)
             except Exception as e:
@@ -111,9 +111,9 @@ class PumpCog(commands.Cog):
         if actual_run_seconds < seconds:
              await interaction.response.send_message(f"Warning: Running pump for {actual_run_seconds}s due to remaining session time.", ephemeral=True)
              # Need followup below, so defer
-             await interaction.response.defer(ephemeral=False, thinking=True) # Acknowledge interaction
+             await interaction.response.defer(ephemeral=True, thinking=True) # Acknowledge interaction ephemerally
         else:
-             await interaction.response.defer(ephemeral=False, thinking=True) # Acknowledge interaction
+             await interaction.response.defer(ephemeral=True, thinking=True) # Acknowledge interaction ephemerally
 
 
         pump_on_success = False
@@ -129,12 +129,12 @@ class PumpCog(commands.Cog):
                         pump_on_success = True
                         start_pump_timer(self.bot)
                         await self.update_status()
-                        await interaction.followup.send(f"Pump turned ON for {actual_run_seconds} seconds! {format_time(self.bot.session_time_remaining)} remaining in session.")
+                        await interaction.followup.send(f"Pump turned ON for {actual_run_seconds} seconds! {format_time(self.bot.session_time_remaining)} remaining in session.", ephemeral=True)
                     else:
-                        await interaction.followup.send(f"Failed to turn pump on. Server status: {response.status}")
+                        await interaction.followup.send(f"Failed to turn pump on. Server status: {response.status}", ephemeral=True)
                         return # Don't proceed if pump didn't turn on
             except Exception as e:
-                 await interaction.followup.send(f"Error contacting server to turn pump ON: {e}")
+                 await interaction.followup.send(f"Error contacting server to turn pump ON: {e}", ephemeral=True)
                  return # Don't proceed
 
             if not pump_on_success:
@@ -159,19 +159,19 @@ class PumpCog(commands.Cog):
                         if interaction.is_expired():
                              print("Interaction expired before sending pump_timed OFF message.")
                         else:
-                             await interaction.followup.send(f"Pump turned OFF after timed run! {format_time(self.bot.session_time_remaining)} remaining in session.")
+                             await interaction.followup.send(f"Pump turned OFF after timed run! {format_time(self.bot.session_time_remaining)} remaining in session.", ephemeral=True)
                     else:
                          # Check if interaction is still valid
                          if interaction.is_expired():
                               print(f"Interaction expired. Failed to turn pump off after timeout! Server status: {response.status}")
                          else:
-                              await interaction.followup.send(f"Failed to turn pump off after timeout! Server status: {response.status}")
+                              await interaction.followup.send(f"Failed to turn pump off after timeout! Server status: {response.status}", ephemeral=True)
             except Exception as e:
                  # Check if interaction is still valid
                  if interaction.is_expired():
                       print(f"Interaction expired. Error contacting server to turn pump OFF: {e}")
                  else:
-                      await interaction.followup.send(f"Error contacting server to turn pump OFF: {e}")
+                      await interaction.followup.send(f"Error contacting server to turn pump OFF: {e}", ephemeral=True)
 
 
     @pump_on.error
