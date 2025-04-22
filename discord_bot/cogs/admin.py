@@ -1,10 +1,12 @@
-\
 import discord
 from discord.ext import commands
 from discord import app_commands
 import aiohttp
 import asyncio
-from utils import is_wearer, dm_wearer_on_use, save_wearer_id, save_session_state, auto_unlatch, update_session_time
+import logging
+from utils import is_wearer, dm_wearer_on_use, save_wearer_id, save_session_state, auto_unlatch, update_session_time, format_time
+
+logger = logging.getLogger(__name__)
 
 class AdminCog(commands.Cog):
     def __init__(self, bot):
@@ -79,7 +81,7 @@ class AdminCog(commands.Cog):
 
         # If latching, ensure pump is off
         if new_state:
-            update_session_time(self.bot) # Update time before turning off pump
+            # async with aiohttp.ClientSession() as session:
             async with aiohttp.ClientSession() as session:
                 try:
                     async with session.post(
@@ -135,6 +137,50 @@ class AdminCog(commands.Cog):
         await self.update_status()
         await interaction.response.send_message(response_message, ephemeral=True)
 
+    @app_commands.command(name="bank_time", description="[Wearer Only] Manually add time to the bank.")
+    @app_commands.check(is_wearer)
+    @app_commands.describe(seconds="Number of seconds to add to the bank.")
+    async def bank_time(self, interaction: discord.Interaction, seconds: int):
+        """Manually adds time to the banked time pool."""
+        if seconds <= 0:
+            await interaction.response.send_message("Please provide a positive number of seconds.", ephemeral=True)
+            return
+
+        max_bank = self.bot.config.get('max_banked_time', 3600)
+        old_banked_time = self.bot.banked_time
+        self.bot.banked_time = min(old_banked_time + seconds, max_bank)
+        added_time = self.bot.banked_time - old_banked_time
+
+        save_session_state(self.bot)
+        logger.info(f"Wearer manually banked {added_time}s. New banked time: {self.bot.banked_time}s.")
+
+        await interaction.response.send_message(
+            f"Added {format_time(added_time)} to the bank. "
+            f"Total banked time is now {format_time(self.bot.banked_time)}.",
+            ephemeral=True
+        )
+        # Optionally update status immediately
+        monitor_cog = self.bot.get_cog("MonitorCog")
+        if monitor_cog:
+            await monitor_cog.update_bot_status() # type: ignore
+
+    @app_commands.command(name="reset_bank", description="[Wearer Only] Resets the banked time to zero.")
+    @app_commands.check(is_wearer)
+    async def reset_bank(self, interaction: discord.Interaction):
+        """Resets the banked time pool to zero."""
+        old_banked_time = self.bot.banked_time
+        self.bot.banked_time = 0
+        save_session_state(self.bot)
+        logger.info(f"Wearer reset banked time from {format_time(old_banked_time)} to 0.")
+
+        await interaction.response.send_message(
+            f"Banked time has been reset to 0 (was {format_time(old_banked_time)}).",
+            ephemeral=True
+        )
+        # Update status
+        monitor_cog = self.bot.get_cog("MonitorCog")
+        if monitor_cog:
+            await monitor_cog.update_bot_status() # type: ignore
 
     @restart.error
     @latch.error

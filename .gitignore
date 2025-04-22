@@ -6,6 +6,7 @@ micropython/
 discord_bot/bot.json
 bot.json
 discord_bot/session.json
+discord_bot/bot.json
 session.json
 discord_bot/__pycache__/
 discord_bot/cogs/__pycache__/

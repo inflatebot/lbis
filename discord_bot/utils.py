@@ -1,18 +1,34 @@
-\
 import asyncio
 import json
 import discord
 from discord.ext import commands
 import functools
 import os
+import logging
+import time  # Added
+import aiohttp  # Added for API requests
+
+# --- Constants ---
+_utils_dir = os.path.dirname(os.path.abspath(__file__))  # Get directory of utils.py
+SESSION_FILE = os.path.join(_utils_dir, "session.json")  # Path relative to utils.py
+logger = logging.getLogger(__name__)
 
 # --- Time Formatting ---
 
-def format_time(seconds):
-    """Format seconds into minutes and seconds"""
-    minutes = int(seconds // 60)
-    seconds = int(seconds % 60)
-    return f"{minutes}m {seconds}s"
+def format_time(seconds: int) -> str:
+    """Formats seconds into a human-readable string (e.g., 1h 5m 30s)."""
+    if seconds < 0:
+        seconds = 0  # Or handle negative display if needed
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    parts = []
+    if h > 0:
+        parts.append(f"{h}h")
+    if m > 0:
+        parts.append(f"{m}m")
+    if s > 0 or not parts:  # Show seconds if it's non-zero or if hours/minutes are zero
+        parts.append(f"{s}s")
+    return " ".join(parts) if parts else "0s"
 
 # --- Configuration & State Persistence ---
 
@@ -31,16 +47,23 @@ def save_session_state(bot):
         'pump_last_on_time': bot.pump_last_on_time,
         'pump_total_on_time': bot.pump_total_on_time,
         'pump_state': bot.pump_state,
-        'default_session_time': bot.default_session_time, # Add this line
+        'default_session_time': bot.default_session_time,
+        'banked_time': bot.banked_time, # Added
     }
-    with open('session.json', 'w') as f:
-        json.dump(state, f)
+    # Use the absolute path defined in SESSION_FILE
+    try:
+        with open(SESSION_FILE, 'w') as f:
+            json.dump(state, f, indent=4)  # Added indent for readability
+        logger.debug(f"Session state saved to {SESSION_FILE}")
+    except IOError as e:
+        logger.error(f"Failed to save session state to {SESSION_FILE}: {e}")
 
 def load_session_state(bot):
     """Loads session state from a file and initializes bot attributes."""
     default_initial_time = bot.config.get('max_session_time', 1800) # Default to max_session or 30min
     try:
-        with open('session.json', 'r') as f:
+        # Use the absolute path defined in SESSION_FILE
+        with open(SESSION_FILE, 'r') as f:
             state = json.load(f)
             bot.session_time_remaining = state.get('session_time_remaining', 0)
             bot.last_session_update = state.get('last_session_update', None)
@@ -48,20 +71,30 @@ def load_session_state(bot):
             bot.pump_last_on_time = state.get('pump_last_on_time', 0)
             bot.pump_total_on_time = state.get('pump_total_on_time', 0)
             bot.pump_state = state.get('pump_state', False)
-            # Load default_session_time here, provide a default
-            bot.default_session_time = state.get('default_session_time', default_initial_time) # Use the default
-
-    except (IOError, json.JSONDecodeError):
-        print("Session state file not found or invalid. Initializing with defaults.")
-        # Initialize with defaults if file doesn't exist or is corrupt
+            bot.default_session_time = state.get('default_session_time', default_initial_time)
+            bot.banked_time = state.get('banked_time', 0) # Added
+            logger.info(f"Session state loaded from {SESSION_FILE}.")
+    except FileNotFoundError:
+        logger.warning(f"Session state file not found at {SESSION_FILE}. Initializing with defaults.")
         bot.session_time_remaining = 0
         bot.last_session_update = None
         bot.session_pump_start = None
         bot.pump_last_on_time = 0
         bot.pump_total_on_time = 0
         bot.pump_state = False
-        # Initialize default_session_time here too
-        bot.default_session_time = default_initial_time # Use the default
+        bot.default_session_time = default_initial_time
+        bot.banked_time = 0 # Added
+        save_session_state(bot) # Create the file with defaults using the correct path
+    except (IOError, json.JSONDecodeError) as e:
+        logger.error(f"Error loading session state from {SESSION_FILE}: {e}")
+        bot.session_time_remaining = 0
+        bot.last_session_update = None
+        bot.session_pump_start = None
+        bot.pump_last_on_time = 0
+        bot.pump_total_on_time = 0
+        bot.pump_state = False
+        bot.default_session_time = default_initial_time
+        bot.banked_time = 0 # Added
 
     # Ensure ready_note attribute exists even if loading from an old file
     if not hasattr(bot, 'ready_note'):
@@ -69,12 +102,21 @@ def load_session_state(bot):
 
 # --- Session Time Management ---
 
-def update_session_time(bot):
-    """Updates session time based on pump usage"""
-    if bot.session_pump_start is not None:
-        elapsed = (asyncio.get_event_loop().time() - bot.session_pump_start)
-        bot.session_time_remaining = max(0, bot.session_time_remaining - elapsed)
-        bot.session_pump_start = None  # Reset pump start time after calculating
+def update_session_time(bot: 'LBISBot', delta_seconds: int):
+    """Updates the session time remaining, ensuring it stays within bounds."""
+    # We don't apply max_session_time cap here directly.
+    # Commands adding time (/add_time) should enforce the cap.
+    # This function just handles decrementing or applying changes from pump runs.
+    new_time = bot.session_time_remaining + delta_seconds
+
+    # Prevent session time from going below zero
+    bot.session_time_remaining = max(0, new_time)
+
+    # Log the change
+    if delta_seconds != 0:
+        logger.debug(f"Session time updated by {delta_seconds}s. New time: {bot.session_time_remaining}s")
+
+    # Note: State saving is handled by the calling function (e.g., end of pump loop)
 
 def start_pump_timer(bot):
     """Start tracking pump run time"""
@@ -147,4 +189,53 @@ def dm_wearer_on_use(command_name):
             return await func(cog_instance, interaction, *args, **kwargs)
         return wrapper
     return decorator
+
+# --- API Interaction ---
+
+async def api_request(bot, endpoint: str, method: str = "GET", data: dict = None, timeout: int = 5) -> dict | None:
+    """
+    Make a request to the lBIS API.
+    
+    Args:
+        bot: The bot instance containing API_BASE_URL
+        endpoint: API endpoint (without leading slash)
+        method: HTTP method (GET/POST)
+        data: Optional data to send with request
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Response data as dict if successful and response has data
+        None if request failed or had no data
+    """
+    url = f"{bot.API_BASE_URL}/api/{endpoint}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            kwargs = {
+                'timeout': timeout
+            }
+            if data:
+                kwargs['json'] = data
+            
+            async with getattr(session, method.lower())(url, **kwargs) as resp:
+                if resp.status != 200:
+                    logger.warning(f"API request to {endpoint} failed with status {resp.status}")
+                    return None
+                    
+                try:
+                    return await resp.json()
+                except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                    # For endpoints that return plain text
+                    text = await resp.text()
+                    try:
+                        # Try to handle numeric responses
+                        return {"value": int(text)}
+                    except ValueError:
+                        return {"message": text}
+                        
+    except asyncio.TimeoutError:
+        logger.warning(f"API request to {endpoint} timed out after {timeout}s")
+    except Exception as e:
+        logger.error(f"API request to {endpoint} failed with error: {e}")
+    
+    return None
 
