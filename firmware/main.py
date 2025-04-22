@@ -1,7 +1,7 @@
 import gc, json, time
 from machine import Pin, idle
 from network import WLAN
-import lbis
+import firmware.lbis as lbis
 
 gc.enable()
 
