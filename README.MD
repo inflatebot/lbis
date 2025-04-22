@@ -5,13 +5,12 @@ The Leg-worn Belly Inflation System, or lBIS (lowercase L, read like "ibis" [^1]
 The source code and plans for lBIS are distributed under the [MIT License.](LICENSE.MD)
 
 > [!IMPORTANT]
-> The lBIS prototype is a reference design that uses off-the-shelf components. This is the designer's first major electronics project. It should not be taken as gospel on the best way to execute this concept. The purpose of open-sourcing lBIS is for the interest and curiosity of the kink community and as a public document of the project. Take the advice herein with a grain of salt and use your own judgement. The prototype was built with a... we'll say *lax* attitude for the builder's well-being. The builder however does care about *your* well-being, and will try to steer you towards doing this better than they did.
-
-> [!WARNING]
-> lBIS inflates the user via air enema, a process which carries an inherent risk. lBIS is not intended for users who are not already comfortable and experienced inflating themselves. While the pump utilized *shouldn't* be capable of causing severe injury, by building and using lBIS, you agree to do so at your own risk. See [Safety](#safety) for recommended practice.
+> - While this repository does not contain any explicit content, the device and the activities it enables are for adults ONLY. Support WILL NOT BE PROVIDED if there is reason to believe the one requesting said support is a minor.
+> - The lBIS prototype is a reference design that uses off-the-shelf components. This is the designer's first major electronics project. It should not be taken as gospel on the best way to execute this concept. The purpose of open-sourcing lBIS is for the interest and curiosity of the kink community and as a public document of the project. Take the advice herein with a grain of salt and use your own judgement. The prototype was built with a... we'll say *lax* attitude for the builder's well-being. The builder however does care about *your* well-being, and will try to steer you towards doing this better than they did.
 
 > [!CAUTION]
-> lBIS opens up the possibility of public play. Ensure that your usage of lBIS is compliant with regional laws, public decency, and common sense. Don't Be That Guy™.
+> - lBIS inflates the user via air enema, a process which carries an inherent risk. lBIS is not intended for users who are not already comfortable and experienced inflating themselves. While the pump utilized *shouldn't* be capable of causing severe injury, by building and using lBIS, you agree to do so at your own risk. See [Safety](#safety) for recommended practice. 
+> - lBIS opens up the possibility of public play. Ensure that your usage of lBIS is compliant with regional laws, public decency, and common sense. Don't Be That Guy™.
 
 # Materials
 
