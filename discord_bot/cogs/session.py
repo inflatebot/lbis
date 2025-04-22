@@ -68,16 +68,5 @@ class SessionCog(commands.Cog):
         await self.bot.request_status_update() # Use bot method
         await interaction.response.send_message(f"Session time set to {format_time(self.bot.session_time_remaining)}.", ephemeral=True)
 
-    @add_time.error
-    @reset_time.error
-    @set_time.error
-    async def session_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.errors.CheckFailure):
-            await interaction.response.send_message("Only the device wearer can use this command.", ephemeral=True)
-        else:
-            print(f"Error in session command: {error}")
-            await interaction.response.send_message("An unexpected error occurred.", ephemeral=True)
-
-
 async def setup(bot):
   await bot.add_cog(SessionCog(bot))

@@ -21,6 +21,39 @@ class PumpCog(commands.Cog):
             self.bot.pump_task.cancel()
             logger.info("Cancelled running pump task on cog unload.")
 
+    async def _check_interruptions(self) -> tuple[bool, str]:
+        """Checks for conditions that should interrupt the pump loop."""
+        if self.bot.latch_active:
+            logger.info("Pump interruption: Latch active.")
+            return True, "latched"
+        if not self.bot.service_was_up:
+            logger.info("Pump interruption: API service down.")
+            return True, "service down"
+        return False, ""
+
+    async def _cleanup_pump_task(self, actual_run_duration: float, consumed_session_time: int, interruption_reason: str = ""):
+        """Handles the common cleanup tasks after a pump loop finishes or is interrupted."""
+        logger.info(f"Pump task cleanup. Duration: {actual_run_duration:.2f}s, Consumed Session: {consumed_session_time}s, Reason: '{interruption_reason}'")
+        if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
+            logger.info("Pump turned off via API.")
+            self.bot.last_pump_time = time.time()
+        else:
+            logger.error("Failed to turn off pump via API during cleanup.")
+
+        if consumed_session_time > 0:
+            update_session_time(self.bot, -consumed_session_time)
+
+        self.bot.pump_task = None
+        self.bot.pump_task_end_time = None
+
+        save_session_state(self.bot)
+        await self.bot.request_status_update()
+
+        if interruption_reason:
+            logger.warning(f"Pump task interrupted: {interruption_reason}. Ran for {format_time(int(actual_run_duration))}.")
+        else:
+            logger.info(f"Pump task completed successfully. Ran for {format_time(int(actual_run_duration))}.")
+
     async def _timed_pump_loop(self, initial_run_seconds: int):
         start_time = asyncio.get_event_loop().time()
         actual_run_duration = 0
@@ -30,17 +63,9 @@ class PumpCog(commands.Cog):
         try:
             logger.info(f"Starting timed pump loop. Target end time: {self.bot.pump_task_end_time}")
             while asyncio.get_event_loop().time() < self.bot.pump_task_end_time:
-                if self.bot.latch_active:
-                    interrupted = True
-                    interruption_reason = "latched"
-                    logger.info("Pump latched during timed pump.")
+                interrupted, interruption_reason = await self._check_interruptions()
+                if interrupted:
                     break
-                if not self.bot.service_was_up:
-                    interrupted = True
-                    interruption_reason = "service down"
-                    logger.info("API service went down during timed pump.")
-                    break
-
                 await asyncio.sleep(0.5)
 
             actual_run_duration = asyncio.get_event_loop().time() - start_time
@@ -55,6 +80,7 @@ class PumpCog(commands.Cog):
                     banked_amount = self.bot.banked_time - old_banked
                     if banked_amount > 0:
                         logger.info(f"Banking {banked_amount}s due to interruption ({interruption_reason}).")
+                        save_session_state(self.bot)
 
         except asyncio.CancelledError:
             logger.info("Timed pump task cancelled.")
@@ -62,26 +88,7 @@ class PumpCog(commands.Cog):
             interrupted = True
             interruption_reason = "cancelled"
         finally:
-            logger.info("Timed pump loop cleanup.")
-            if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
-                logger.info("Pump turned off via API after timed session.")
-                self.bot.last_pump_time = time.time()
-            else:
-                logger.error("Failed to turn off pump via API after timed session.")
-
-            update_session_time(self.bot, -int(actual_run_duration))
-
-            self.bot.pump_task = None
-            self.bot.pump_task_end_time = None
-
-            save_session_state(self.bot)
-
-            await self.bot.request_status_update()
-
-            if interrupted:
-                logger.warning(f"Timed pump interrupted due to: {interruption_reason}. Ran for {format_time(int(actual_run_duration))}.")
-            else:
-                logger.info(f"Timed pump completed successfully. Ran for {format_time(int(actual_run_duration))}.")
+            await self._cleanup_pump_task(actual_run_duration, int(actual_run_duration), interruption_reason)
 
     async def _banked_pump_loop(self, initial_run_seconds: int):
         start_time = asyncio.get_event_loop().time()
@@ -96,16 +103,10 @@ class PumpCog(commands.Cog):
             last_decrement_time = start_time
 
             while asyncio.get_event_loop().time() < self.bot.pump_task_end_time:
-                if self.bot.latch_active:
-                    interrupted = True
-                    interruption_reason = "latched"
-                    logger.info("Pump latched during banked pump.")
+                interrupted, interruption_reason = await self._check_interruptions()
+                if interrupted:
                     break
-                if not self.bot.service_was_up:
-                    interrupted = True
-                    interruption_reason = "service down"
-                    logger.info("API service went down during banked pump.")
-                    break
+
                 if self.bot.banked_time <= 0:
                     interrupted = True
                     interruption_reason = "bank empty"
@@ -145,31 +146,14 @@ class PumpCog(commands.Cog):
             interrupted = True
             interruption_reason = "cancelled"
         finally:
-            logger.info("Banked pump loop cleanup.")
-            if await api_request(self.bot, "setPumpState", method="POST", data={"pump": 0}):
-                logger.info("Pump turned off via API after banked session.")
-                self.bot.last_pump_time = time.time()
-            else:
-                logger.error("Failed to turn off pump via API after banked session.")
+            await self._cleanup_pump_task(actual_run_duration, decremented_session, interruption_reason)
+            if decremented_bank > 0:
+                logger.info(f"Consumed {format_time(decremented_bank)} from bank.")
 
-            update_session_time(self.bot, -decremented_session)
-
-            self.bot.pump_task = None
-            self.bot.pump_task_end_time = None
-
-            save_session_state(self.bot)
-
-            await self.bot.request_status_update()
-
-            if interrupted:
-                logger.warning(f"Banked pump interrupted due to: {interruption_reason}. Ran for {format_time(int(actual_run_duration))}, consumed {format_time(decremented_bank)} bank & session time.")
-            else:
-                logger.info(f"Banked pump completed successfully. Ran for {format_time(int(actual_run_duration))}, consumed {format_time(decremented_bank)} bank & session time.")
-
-    @app_commands.command(name="pump_timed", description="Runs the pump for a specific duration in seconds.")
-    @app_commands.describe(seconds="Number of seconds to run the pump (max configured in bot.json).")
+    @app_commands.command(name="pump_timed", description="Runs the pump for a specific duration in seconds (default 30s).")
+    @app_commands.describe(seconds="Number of seconds to run the pump (default 30, max configured in bot.json).")
     @dm_wearer_on_use("pump_timed")
-    async def pump_timed(self, interaction: discord.Interaction, seconds: int):
+    async def pump_timed(self, interaction: discord.Interaction, seconds: int = 30):
         max_pump_duration = self.bot.config.get('max_pump_duration', 60)
 
         if seconds <= 0:

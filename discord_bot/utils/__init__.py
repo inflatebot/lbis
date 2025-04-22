@@ -4,7 +4,7 @@ from .state_persistence import save_wearer_id, save_session_state, load_session_
 from .session_management import update_session_time, start_pump_timer
 from .latch_management import auto_unlatch
 from .permissions import is_wearer, notify_wearer, dm_wearer_on_use
-from .api import api_request
+from .api import api_request, get_api_pump_state
 
 __all__ = [
     'format_time',
@@ -18,4 +18,5 @@ __all__ = [
     'notify_wearer',
     'dm_wearer_on_use',
     'api_request',
+    'get_api_pump_state',
 ]

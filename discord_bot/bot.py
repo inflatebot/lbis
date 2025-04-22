@@ -3,10 +3,14 @@ import discord
 from discord.ext import commands
 import json
 import asyncio
-import logging
+import logging  # Import logging
+from discord import app_commands  # Added for error handling
 
 # Local imports
 import utils  # Import the utils module
+
+# Setup logger for this module
+logger = logging.getLogger(__name__)
 
 # --- Configuration Loading ---
 DEFAULT_CONFIG = {
@@ -99,9 +103,49 @@ class lBISBot(commands.Bot):
         except Exception as e:
             print(f"Failed to sync commands: {e}")
 
+        # Add the global error handler AFTER loading cogs
+        self.tree.on_error = self.on_app_command_error
+
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
         # Initial status update is handled by the MonitorCog's loop starting
+
+    async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        """Global error handler for application commands."""
+        if isinstance(error, app_commands.errors.CheckFailure):
+            # Handle permission errors centrally
+            # Check if response already sent before sending
+            if not interaction.response.is_done():
+                await interaction.response.send_message("Only the device wearer can use this command.", ephemeral=True)
+            else:
+                # If deferred or already responded, use followup
+                try:
+                    await interaction.followup.send("Only the device wearer can use this command.", ephemeral=True)
+                except discord.errors.NotFound:
+                    logger.warning("Could not send CheckFailure followup: Interaction expired or not found.")
+            logger.warning(f"CheckFailure handled for user {interaction.user.id} on command {interaction.command.name if interaction.command else 'unknown'}")
+        elif isinstance(error, app_commands.errors.CommandInvokeError):
+            # Log the original error for debugging
+            original_error = error.original
+            logger.error(f"Error invoking command '{interaction.command.name if interaction.command else 'unknown'}': {original_error}", exc_info=original_error)
+            # Send a generic message to the user
+            if not interaction.response.is_done():
+                await interaction.response.send_message("An unexpected error occurred while running the command.", ephemeral=True)
+            else:
+                try:
+                    await interaction.followup.send("An unexpected error occurred while running the command.", ephemeral=True)
+                except discord.errors.NotFound:
+                    logger.warning("Could not send followup error message: Interaction expired or not found.")
+        else:
+            # Handle other specific app command errors if needed
+            logger.error(f"Unhandled app command error: {error}", exc_info=error)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("An error occurred.", ephemeral=True)
+            else:
+                try:
+                    await interaction.followup.send("An error occurred.", ephemeral=True)
+                except discord.errors.NotFound:
+                    logger.warning("Could not send followup error message: Interaction expired or not found.")
 
 
 # --- Main Execution ---

@@ -154,28 +154,5 @@ class AdminCog(commands.Cog):
         # Use bot method for status update
         await self.bot.request_status_update()
 
-    @restart.error
-    @latch.error
-    @set_wearer.error # Although set_wearer doesn't use the check, catch other potential errors
-    async def admin_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.errors.CheckFailure):
-            await interaction.response.send_message("Only the device wearer can use this command.", ephemeral=True)
-        elif isinstance(error, app_commands.errors.RangeError):
-             await interaction.response.send_message(f"Invalid value: {error}", ephemeral=True)
-        else:
-            print(f"Error in admin command: {error}")
-            # Check if response already sent
-            if not interaction.response.is_done():
-                 await interaction.response.send_message("An unexpected error occurred.", ephemeral=True)
-            else:
-                 # If deferred or already responded, use followup
-                 try:
-                      await interaction.followup.send("An unexpected error occurred.", ephemeral=True)
-                 except discord.errors.NotFound:
-                      print("Failed to send followup error message: Interaction not found.")
-                 except Exception as e:
-                      print(f"Failed to send followup error message: {e}")
-
-
 async def setup(bot):
   await bot.add_cog(AdminCog(bot))

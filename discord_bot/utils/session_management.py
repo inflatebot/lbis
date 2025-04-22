@@ -22,6 +22,7 @@ def update_session_time(bot: commands.Bot, delta_seconds: int):
 
     # Note: State saving is handled by the calling function (e.g., end of pump loop)
 
-def start_pump_timer(bot):
+# TODO: Verify if this function is used or redundant.
+def start_pump_timer(bot): # this might be redundant? leave it for now Gemini
     """Start tracking pump run time"""
     bot.session_pump_start = asyncio.get_event_loop().time()

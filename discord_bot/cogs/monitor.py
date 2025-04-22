@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 import aiohttp
 import asyncio
 import logging
-from utils import format_time, api_request, save_session_state, update_session_time
+from utils import format_time, api_request, save_session_state, update_session_time, get_api_pump_state
 
 logger = logging.getLogger(__name__)
 
@@ -38,41 +38,15 @@ class MonitorCog(commands.Cog):
 
             pump_state_str = ""
             if self.bot.pump_task and not self.bot.pump_task.done():
-                pump_state_str = "ON"
+                pump_state_str = "ON" # If task is running, it must be ON
             else:
-                if not self.bot.device_base_url:
-                    logger.error("Device API base URL not configured. Cannot monitor pump status.")
+                pump_is_on = await get_api_pump_state(self.bot)
+                if pump_is_on is None:
                     pump_state_str = "UNKNOWN"
                 else:
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            status_url = f"{self.bot.device_base_url}/api/getPumpState"
-                            logger.debug(f"Checking pump status at: {status_url}")
-                            async with session.get(status_url) as response:
-                                if response.status == 200:
-                                    # Try to parse as text first since the API returns "0" or "1"
-                                    text = await response.text()
-                                    try:
-                                        # Convert text to boolean
-                                        is_on = bool(int(text))
-                                        pump_state_str = "ON" if is_on else "OFF"
-                                    except ValueError:
-                                        # If text->int conversion fails, try JSON as fallback
-                                        try:
-                                            pump_state = await response.json()
-                                            pump_state_str = "ON" if pump_state.get('is_on') else "OFF"
-                                        except:
-                                            logger.error(f"Failed to parse pump state from response: {text}")
-                                            pump_state_str = "UNKNOWN"
-                                else:
-                                    logger.error(f"API request to {status_url} failed with status {response.status}")
-                                    pump_state_str = "UNKNOWN"
-                    except Exception as e:
-                        logger.error(f"Failed to check pump status: {e}")
-                        pump_state_str = "UNKNOWN"
+                    pump_state_str = "ON" if pump_is_on else "OFF"
 
             activity_string = f"{latch_str}Pump: {pump_state_str} | Sess: {session_str} | Bank: {banked_str}"
-            # Use CustomActivity instead of Game
             activity = discord.CustomActivity(name=activity_string)
 
         try:
@@ -128,32 +102,11 @@ class MonitorCog(commands.Cog):
 
         is_manually_on = False
         if not (self.bot.pump_task and not self.bot.pump_task.done()):
-            if not self.bot.device_base_url:
-                logger.error("Device API base URL not configured. Cannot monitor pump status.")
-            else:
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        status_url = f"{self.bot.device_base_url}/api/getPumpState"
-                        logger.debug(f"Checking pump status at: {status_url}")
-                        async with session.get(status_url) as response:
-                            if response.status == 200:
-                                # Try to parse as text first since the API returns "0" or "1"
-                                text = await response.text()
-                                try:
-                                    # Convert text to boolean
-                                    is_on = bool(int(text))
-                                    is_manually_on = is_on
-                                except ValueError:
-                                    # If text->int conversion fails, try JSON as fallback
-                                    try:
-                                        pump_state = await response.json()
-                                        is_manually_on = pump_state.get('is_on', False)
-                                    except:
-                                        logger.error(f"Failed to parse pump state from response: {text}")
-                            else:
-                                logger.error(f"API request to {status_url} failed with status {response.status}")
-                except Exception as e:
-                    logger.error(f"Failed to check pump status: {e}")
+            pump_is_on = await get_api_pump_state(self.bot)
+            if pump_is_on is True: # Explicitly check for True
+                is_manually_on = True
+            elif pump_is_on is None:
+                logger.warning("Session timer: Could not determine pump state from API.")
 
         if is_manually_on:
             if self.bot.session_time_remaining > 0:
