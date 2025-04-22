@@ -102,7 +102,7 @@ def load_session_state(bot):
 
 # --- Session Time Management ---
 
-def update_session_time(bot: 'lBISBot', delta_seconds: int):
+def update_session_time(bot: commands.Bot, delta_seconds: int):
     """Updates the session time remaining, ensuring it stays within bounds."""
     # We don't apply max_session_time cap here directly.
     # Commands adding time (/add_time) should enforce the cap.
