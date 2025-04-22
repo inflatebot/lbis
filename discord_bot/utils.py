@@ -5,8 +5,9 @@ from discord.ext import commands
 import functools
 import os
 import logging
-import time  # Added
-import aiohttp  # Added for API requests
+import time
+import aiohttp
+from state_manager import StateManager  # Import the new manager
 
 # --- Constants ---
 _utils_dir = os.path.dirname(os.path.abspath(__file__))  # Get directory of utils.py
@@ -36,69 +37,37 @@ def save_wearer_id(bot, wearer_id):
     bot.config['wearer_id'] = wearer_id
     with open('bot.json', 'w') as config_file:
         json.dump(bot.config, config_file, indent=4)
-    bot.OWNER_ID = wearer_id # Update runtime state
+    bot.OWNER_ID = wearer_id  # Update runtime state
 
 def save_session_state(bot):
-    """Saves the current session state to a file."""
-    state = {
-        'session_time_remaining': bot.session_time_remaining,
-        'last_session_update': bot.last_session_update,
-        'session_pump_start': bot.session_pump_start,
-        'pump_last_on_time': bot.pump_last_on_time,
-        'pump_total_on_time': bot.pump_total_on_time,
-        'pump_state': bot.pump_state,
-        'default_session_time': bot.default_session_time,
-        'banked_time': bot.banked_time, # Added
-    }
-    # Use the absolute path defined in SESSION_FILE
-    try:
-        with open(SESSION_FILE, 'w') as f:
-            json.dump(state, f, indent=4)  # Added indent for readability
-        logger.debug(f"Session state saved to {SESSION_FILE}")
-    except IOError as e:
-        logger.error(f"Failed to save session state to {SESSION_FILE}: {e}")
+    """Updates the state manager with the bot's current state and saves it."""
+    if hasattr(bot, 'state_manager') and bot.state_manager:
+        bot.state_manager.update_and_save(bot)
+    else:
+        logger.error("Attempted to save state, but state_manager is not initialized.")
 
 def load_session_state(bot):
-    """Loads session state from a file and initializes bot attributes."""
-    default_initial_time = bot.config.get('max_session_time', 1800) # Default to max_session or 30min
-    try:
-        # Use the absolute path defined in SESSION_FILE
-        with open(SESSION_FILE, 'r') as f:
-            state = json.load(f)
-            bot.session_time_remaining = state.get('session_time_remaining', 0)
-            bot.last_session_update = state.get('last_session_update', None)
-            bot.session_pump_start = state.get('session_pump_start', None)
-            bot.pump_last_on_time = state.get('pump_last_on_time', 0)
-            bot.pump_total_on_time = state.get('pump_total_on_time', 0)
-            bot.pump_state = state.get('pump_state', False)
-            bot.default_session_time = state.get('default_session_time', default_initial_time)
-            bot.banked_time = state.get('banked_time', 0) # Added
-            logger.info(f"Session state loaded from {SESSION_FILE}.")
-    except FileNotFoundError:
-        logger.warning(f"Session state file not found at {SESSION_FILE}. Initializing with defaults.")
-        bot.session_time_remaining = 0
-        bot.last_session_update = None
-        bot.session_pump_start = None
-        bot.pump_last_on_time = 0
-        bot.pump_total_on_time = 0
-        bot.pump_state = False
-        bot.default_session_time = default_initial_time
-        bot.banked_time = 0 # Added
-        save_session_state(bot) # Create the file with defaults using the correct path
-    except (IOError, json.JSONDecodeError) as e:
-        logger.error(f"Error loading session state from {SESSION_FILE}: {e}")
-        bot.session_time_remaining = 0
-        bot.last_session_update = None
-        bot.session_pump_start = None
-        bot.pump_last_on_time = 0
-        bot.pump_total_on_time = 0
-        bot.pump_state = False
-        bot.default_session_time = default_initial_time
-        bot.banked_time = 0 # Added
+    """Initializes the StateManager and applies the loaded state to the bot."""
+    default_initial_time = bot.config.get('max_session_time', 1800)
+    # Create the state manager instance for the bot
+    bot.state_manager = StateManager(file_path=SESSION_FILE, default_initial_time=default_initial_time)
+    # Apply the loaded state from the manager to the bot instance
+    bot.state_manager.apply_to_bot(bot)
 
-    # Ensure ready_note attribute exists even if loading from an old file
+    # Initialize runtime-only attributes that are not persisted
+    # Ensure these are always present after loading state
+    if not hasattr(bot, 'latch_timer'):
+        bot.latch_timer = None
     if not hasattr(bot, 'ready_note'):
         bot.ready_note = None
+    if not hasattr(bot, 'pump_task'):
+        bot.pump_task = None
+    if not hasattr(bot, 'pump_task_end_time'):
+        bot.pump_task_end_time = None
+    # session_pump_start is technically persisted but needs careful handling
+    # If the bot restarts mid-pump, session_pump_start might be stale.
+    # Consider resetting it or validating it on load if necessary.
+    # For now, we load it via apply_to_bot.
 
 # --- Session Time Management ---
 
@@ -127,11 +96,11 @@ def start_pump_timer(bot):
 async def auto_unlatch(bot, delay):
     """Automatically unlatch after specified delay"""
     await asyncio.sleep(delay)
-    if bot.latch_timer: # Check if it wasn't cancelled
+    if bot.latch_timer:  # Check if it wasn't cancelled
         bot.latch_active = False
         bot.latch_timer = None
         bot.latch_end_time = None
-        bot.latch_reason = None # Clear reason on auto-unlatch
+        bot.latch_reason = None  # Clear reason on auto-unlatch
         save_session_state(bot)
         print("Timed latch expired.")
         if bot.OWNER_ID:
@@ -153,7 +122,7 @@ def is_wearer(interaction: discord.Interaction) -> bool:
 
 async def notify_wearer(bot, interaction: discord.Interaction, command_name: str):
     if not bot.OWNER_ID or interaction.user.id == bot.OWNER_ID:
-        return # Don't notify if no owner set or if owner uses command
+        return  # Don't notify if no owner set or if owner uses command
 
     try:
         wearer = await bot.fetch_user(bot.OWNER_ID)
@@ -164,7 +133,7 @@ async def notify_wearer(bot, interaction: discord.Interaction, command_name: str
             # Get command parameters
             params = []
             if interaction.data and "options" in interaction.data:
-                 for option in interaction.data.get("options", []):
+                for option in interaction.data.get("options", []):
                     params.append(f"{option['name']}:{option['value']}")
             param_str = " " + " ".join(params) if params else ""
 
@@ -179,7 +148,7 @@ def dm_wearer_on_use(command_name):
     def decorator(func):
         # Ensure the decorated function is recognized as a command callback
         if not asyncio.iscoroutinefunction(func):
-             raise TypeError("Decorated function must be a coroutine.")
+            raise TypeError("Decorated function must be a coroutine.")
 
         @functools.wraps(func)
         async def wrapper(cog_instance, interaction: discord.Interaction, *args, **kwargs):
