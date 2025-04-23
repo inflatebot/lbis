@@ -1,8 +1,8 @@
-# Leg-worn Belly Inflation System (lBIS)
+# Low-profile Belly Inflation System (lBIS)
 
 ### The lBIS Discord bot is now being developed in [its own repo.](https://github.com/inflatebot/lbis_discord)
 
-The Leg-worn Belly Inflation System, or lBIS (lowercase L, read like "ibis" [^1]) is a discreet wearable air pump that inflates the user at a gentle, safe(-ish) pace. It is designed to be worn casually, as one would a plug or ring, and be easy to maintain. It is controlled remotely using a WiFi-enabled microcontroller. The components are assembled onto a simple webbing legband which is worn under the clothes.
+The Low-profile Belly Inflation System, or lBIS (lowercase L, read like "ibis" [^1]) is a discreet wearable air pump that inflates the user at a gentle, safe(-ish) pace. It is designed to be worn casually, as one would a plug or ring, and be easy to maintain. It is controlled remotely using a WiFi-enabled microcontroller. The components are assembled onto a simple webbing legband which is worn under the clothes.
 
 The source code and plans for lBIS are distributed under the [MIT License.](LICENSE.MD)
 
@@ -66,7 +66,7 @@ If the IP address is `0.0.0.0`, then the microcontroller has had an issue with g
 If it returns `Polo!` then the API is functional.
 
 5. Use `curl` again to test the relay over the API:
-`curl -XPOST -H "Content-type: application/json" -d '{ "pump": 1 }' '10.105.23.145/api/setPumpState'`
+`curl -XPOST -H "Content-type: application/json" -d '{ "pump": 1 }' '[MCU-IP]/api/setPumpState'`
 If the wiring is correct and the API is functional, your pump should turn on. Repeat with `'{ "pump": 0 }'` to turn it off again.
 
 ## Post-Assembly
