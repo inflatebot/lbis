@@ -1,5 +1,0 @@
-bot
-cogs
-main
-state_manager
-utils

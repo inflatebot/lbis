@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: lbis-discord
-Version: 0.1.0
-Summary: A Discord bot implementing the lBIS project's API
-Requires-Python: >=3.12
-Description-Content-Type: text/markdown
-Requires-Dist: discord>=2.3.2
