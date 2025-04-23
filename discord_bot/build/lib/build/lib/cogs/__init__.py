@@ -1,0 +1,1 @@
+# Makes the cogs directory a package
