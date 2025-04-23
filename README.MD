@@ -1,5 +1,7 @@
 # Leg-worn Belly Inflation System (lBIS)
 
+### The lBIS Discord bot is now being developed in [its own repo.](https://github.com/inflatebot/lbis_discord)
+
 The Leg-worn Belly Inflation System, or lBIS (lowercase L, read like "ibis" [^1]) is a discreet wearable air pump that inflates the user at a gentle, safe(-ish) pace. It is designed to be worn casually, as one would a plug or ring, and be easy to maintain. It is controlled remotely using a WiFi-enabled microcontroller. The components are assembled onto a simple webbing legband which is worn under the clothes.
 
 The source code and plans for lBIS are distributed under the [MIT License.](LICENSE.MD)
