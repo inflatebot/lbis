@@ -10,4 +10,5 @@ discord_bot/bot.json
 session.json
 discord_bot/__pycache__/
 discord_bot/cogs/__pycache__/
+discord_bot/utils/__pycache__/
 .copilot-notes.md
