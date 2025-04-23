@@ -6,6 +6,9 @@ The Low-profile Belly Inflation System, or lBIS (lowercase L, read like "ibis" [
 
 The source code and plans for lBIS are distributed under the [MIT License.](LICENSE.MD)
 
+![Development photo of the lBIS prototype.](https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:br6yuwkgvtn43dz3r65fpwzu/bafkreigrmg2g3x7d3exzywq3oihj3xtewthvjbwydozv4fzjghc3wjntoe@jpeg)
+
+
 > [!IMPORTANT]
 > - While this repository does not contain any explicit content, the device and the activities it enables are for adults ONLY. Support WILL NOT BE PROVIDED if there is reason to believe the one requesting said support is a minor.
 > - The lBIS prototype is a reference design that uses off-the-shelf components. This is the designer's first major electronics project. It should not be taken as gospel on the best way to execute this concept. The purpose of open-sourcing lBIS is for the interest and curiosity of the kink community and as a public document of the project. Take the advice herein with a grain of salt and use your own judgement. The prototype was built with a... we'll say *lax* attitude for the builder's well-being. The builder however does care about *your* well-being, and will try to steer you towards doing this better than they did.
