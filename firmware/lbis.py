@@ -1,16 +1,17 @@
 from phew import server
-from machine import Pin, PWM, soft_reset # Import PWM
+from machine import Pin, PWM, soft_reset
 
-# Rename global variable for clarity
+# PWM stuff
 pump_pwm = None
-PWM_MAX_DUTY = 65535 # Maximum value for duty_u16
+PWM_MAX_DUTY = 65535
+# TODO: explore encapsulating this stuff in an object
 
 def run(pin,host,port):
     global pump_pwm
     pump_pin = Pin(pin or 7, Pin.OUT)
-    pump_pwm = PWM(pump_pin) # Initialize PWM on the pin
-    pump_pwm.freq(1000) # Set PWM frequency (e.g., 1kHz)
-    pump_pwm.duty_u16(0) # Start with pump off (0% duty cycle)
+    pump_pwm = PWM(pump_pin)
+    pump_pwm.freq(1000)
+    pump_pwm.duty_u16(0) # (0% duty cycle = off)
     server.run(host or "0.0.0.0", port or 80)
 
 @server.route("/api/marco", methods=["GET"])
@@ -25,15 +26,13 @@ def restart(request):
     return "Restarting...", 200, {"Content-Type": "application/json"}
 
 @server.route("/api/setPumpState", methods=["POST"])
-def set_pump_state(request): # Renamed function
+def set_pump_state(request):
   global pump_pwm
   try:
     reqState = float(request.data["pump"])
-    # Validate input is between 0.0 and 1.0
     if 0.0 <= reqState <= 1.0:
         duty_cycle = int(reqState * PWM_MAX_DUTY)
         pump_pwm.duty_u16(duty_cycle)
-        # Return the set state
         return f"{reqState:.2f}", 200, {"Content-Type": "application/json"}
     else:
         return "Invalid state value. Must be between 0.0 and 1.0.", 400, {"Content-Type": "application/json"}
@@ -41,7 +40,7 @@ def set_pump_state(request): # Renamed function
       return f"Invalid request data: {e}", 400, {"Content-Type": "application/json"}
 
 @server.route("/api/getPumpState", methods=["GET"])
-def get_pump_state(request): # Renamed function
+def get_pump_state(request):
   global pump_pwm
   current_duty = pump_pwm.duty_u16()
   current_state = current_duty / PWM_MAX_DUTY
@@ -50,4 +49,3 @@ def get_pump_state(request): # Renamed function
 @server.catchall()
 def catchall(request):
   return f"Not Found", 404, {"Content-Type": "application/json"}
-  #return json.dumps({"message" : "Not Found"}), 404, {"Content-Type": "application/json"}
