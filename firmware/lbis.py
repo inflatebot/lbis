@@ -63,6 +63,21 @@ async def get_pump_state(request):
 async def pump_websocket(request, ws):
     global pump_pwm
     print("WebSocket connection established for pump control")
+    # Send the initial state upon connection
+    try:
+        current_duty = pump_pwm.duty_u16()
+        current_state = current_duty / PWM_MAX_DUTY
+        initial_state_message = json.dumps({"state": current_state})
+        await ws.send(initial_state_message)
+        # Print the state to the console as well
+        print(f"Sent initial state: {initial_state_message}")
+    except Exception as e:
+        print(f"Error sending initial state: {e}")
+        # Optionally send an error message over WebSocket if sending initial state fails
+        # await ws.send(json.dumps({"error": "Failed to send initial state"}))
+
+    # The original await ws.send() is removed as we now send the state immediately.
+    print("WebSocket connection established for pump control")
     while True:
         try:
             data = await ws.receive()
