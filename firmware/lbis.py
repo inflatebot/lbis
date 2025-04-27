@@ -77,8 +77,8 @@ async def pump_websocket(request, ws):
                         duty_cycle = int(reqState * PWM_MAX_DUTY)
                         pump_pwm.duty_u16(duty_cycle)
                         print(f"WebSocket setPumpState: state={reqState:.2f}, duty={duty_cycle}")
-                        # Optionally send confirmation back
-                        # await ws.send(json.dumps({"state": reqState}))
+                        #Send confirmation back
+                        await ws.send(json.dumps({"state": reqState}))
                     else:
                         print(f"WebSocket received invalid state: {reqState}")
                         await ws.send(json.dumps({"error": "Invalid state value. Must be between 0.0 and 1.0."}))
