@@ -19,14 +19,16 @@ def run(pin,host,port):
 
 @server.get("/api/marco")
 async def ping(request):
-  return "Polo!", 200, {"Content-Type": "application/json"}
+  response_body = json.dumps({"message": "Polo!"})
+  return response_body, 200, {"Content-Type": "application/json"}
 
 @server.post("/api/restart")
 async def restart(request):
     # restart the server
     print("Restarting...")
     soft_reset()
-    return "Restarting...", 200, {"Content-Type": "application/json"}
+    response_body = json.dumps({"message": "Restarting..."})
+    return response_body, 200, {"Content-Type": "application/json"}
 
 @server.post("/api/setPumpState")
 async def set_pump_state(request):
@@ -38,11 +40,14 @@ async def set_pump_state(request):
         duty_cycle = int(reqState * PWM_MAX_DUTY)
         pump_pwm.duty_u16(duty_cycle)
         print(f"setPumpState called: state={reqState:.2f}, duty={duty_cycle}") # Added logging
-        return f"{reqState:.2f}", 200, {"Content-Type": "application/json"}
+        response_body = json.dumps({"state": reqState})
+        return response_body, 200, {"Content-Type": "application/json"}
     else:
-        return "Invalid state value. Must be between 0.0 and 1.0.", 400, {"Content-Type": "application/json"}
+        response_body = json.dumps({"error": "Invalid state value. Must be between 0.0 and 1.0."})
+        return response_body, 400, {"Content-Type": "application/json"}
   except (KeyError, ValueError, TypeError) as e:
-      return f"Invalid request data: {e}", 400, {"Content-Type": "application/json"}
+      response_body = json.dumps({"error": f"Invalid request data: {e}"})
+      return response_body, 400, {"Content-Type": "application/json"}
 
 @server.get("/api/getPumpState")
 async def get_pump_state(request):
@@ -56,4 +61,5 @@ async def get_pump_state(request):
 
 @server.errorhandler(404)
 async def catchall(request):
-  return f"Not Found", 404, {"Content-Type": "application/json"}
+  response_body = json.dumps({"error": "Not Found"})
+  return response_body, 404, {"Content-Type": "application/json"}
