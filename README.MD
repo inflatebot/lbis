@@ -33,7 +33,7 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 - Webbing made of a meltable fabric, at least an inch wide, buckles
 	- The prototype uses 1.5-inch nylon webbing as it was on hand. 
 - A way to robustly join pieces of webbing
-	- The prototype was sewn together by hand using thick upholstery needles. It may also be feasible to heat-weld the nylon together, but it won't be as nice, and heating nylon irreversibly softens it.
+	- The prototype was sewn together with a standard Singer Heavy-Duty sewing machine. Thicker needles would be recommended over the ones these come with. It may also be feasible to heat-weld the nylon together, but it won't be as nice, and heating nylon irreversibly softens it.
 - Lighter
 	- For melting the ends of webbing and airline tubing
 - Heat gun
