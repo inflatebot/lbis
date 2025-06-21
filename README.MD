@@ -20,7 +20,7 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 # Materials
 
 - A diaphragm air pump capable of running on 5V
-	- The prototype uses an off-the-shelf USB-powered aquarium pump from Amazon, based on a PYP370 pump module, which appears to be the standard. [DFRobot also carries it directly.](https://www.dfrobot.com/product-2374.html)
+	- The prototype uses an off-the-shelf USB-powered aquarium pump from Amazon, based on a PYP370 pump module, which appears to be standard. [DFRobot also carries it directly.](https://www.dfrobot.com/product-2374.html)
 - A WiFi-enabled microcontroller
 	- The prototype uses a Raspberry Pi Pico 2 W but any Micropython-capable controller could work
 - A DC motor driver capable of switching 5V and being signalled by 3.3V (or 5V if that's what your I/O pins use)
@@ -41,7 +41,7 @@ The source code and plans for lBIS are distributed under the [MIT License.](LICE
 - Soft aquarium airline tubing
 - (Optional) Aquarium check valve (to keep the pump end of the airline tubing clean, and enable easy cleaning and replacement of the user end)
 - (Optional) Enema nozzle
-	- An inflatable CleanStream-style plug was used in the prototype, for the possibility of interopterating with the Edge-o-Matic 3000, but if you have a preference, use that. The bore should either be capable of accepting standard 3/16" (4mm) airline tubing directly, or be easily adaptable.
+	- An inflatable CleanStream-style plug may be used, for the possibility of interopterating with the Edge-o-Matic 3000, but if you have a preference, use that. The bore should either be capable of accepting standard 3/16" (4mm) airline tubing directly, or be easily adaptable.
 
 # Construction
 
